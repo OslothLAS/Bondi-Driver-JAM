@@ -4,14 +4,14 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody))]
 public class BondiController : MonoBehaviour
 {
-    [Header("Configuración de Teclas")]
+    [Header("Configuracion de Teclas")]
     [Tooltip("Ejemplo: <Keyboard>/w o <Gamepad>/leftStick/up")]
     public string upKey = "<Keyboard>/w";
     public string downKey = "<Keyboard>/s";
     public string leftKey = "<Keyboard>/a";
     public string rightKey = "<Keyboard>/d";
 
-    [Header("Parámetros del Bondi")]
+    [Header("Parametros del Bondi")]
     public float acceleration = 40f;
     public float steering = 20f;
     [Range(0, 1)] public float driftFactor = 0.95f; // 1 = hielo, 0 = rieles
@@ -22,14 +22,14 @@ public class BondiController : MonoBehaviour
 
     void Awake()
     {
-        // 1. Auto-asignación y configuración de física
+        // 1. Auto-asignacion y configuracion de fisica
         rb = GetComponent<Rigidbody>();
         rb.mass = 1500f; // Peso de un colectivo
         rb.linearDamping = 0.05f;
         rb.angularDamping = 0.05f;
         rb.useGravity = true;
 
-        // 2. Configuración de Input por Código
+        // 2. Configuracion de Input por Codigo
         moveAction = new InputAction("Move", binding: "");
         moveAction.AddCompositeBinding("2DVector")
             .With("Up", upKey)
@@ -42,10 +42,10 @@ public class BondiController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Leer el movimiento (X: giro, Y: aceleración)
+        // Leer el movimiento (X: giro, Y: aceleracion)
         Vector2 input = moveAction.ReadValue<Vector2>();
 
-        // 1. Aceleración y Freno Motor
+        // 1. Aceleracion y Freno Motor
         if (Mathf.Abs(input.y) > 0.01f)
         {
             rb.AddForce(transform.forward * input.y * acceleration, ForceMode.Acceleration);
@@ -57,23 +57,26 @@ public class BondiController : MonoBehaviour
             rb.linearVelocity -= fwdVel * (1 - engineBrake);
         }
 
-        // 2. Rotación (Giro del Bondi)
-        if (rb.linearVelocity.magnitude > 0.1f) // Solo gira si se está moviendo
+        // 2. Rotacion (Giro del Bondi)
+        if (rb.linearVelocity.magnitude > 0.1f) // Solo gira si se esta moviendo
         {
             float direction = Vector3.Dot(rb.linearVelocity, transform.forward) > 0 ? 1 : -1;
             transform.Rotate(Vector3.up * input.x * steering * direction * Time.fixedDeltaTime * 5f);
         }
 
-        // 3. Lógica de Drift (Fricción Lateral)
+        // 3. Logica de Drift (Friccion Lateral)
+        // Guardamos la velocidad vertical (gravedad) antes de manipular la horizontal
+        float verticalVelocity = rb.linearVelocity.y;
+
         // Separamos la velocidad frontal de la lateral
         Vector3 forwardVelocity = transform.forward * Vector3.Dot(rb.linearVelocity, transform.forward);
         Vector3 lateralVelocity = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
 
-        // La velocidad final es la frontal intacta + la lateral reducida por el drift
-        rb.linearVelocity = forwardVelocity + (lateralVelocity * driftFactor);
+        // Calculamos la nueva velocidad horizontal: frontal intacta + lateral reducida por el drift
+        Vector3 combinedVelocity = forwardVelocity + (lateralVelocity * driftFactor);
 
-        // Mantener la velocidad vertical (gravedad) intacta
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, rb.linearVelocity.y, rb.linearVelocity.z);
+        // Reasignamos la velocidad manteniendo la vertical original para no anular la gravedad
+        rb.linearVelocity = new Vector3(combinedVelocity.x, verticalVelocity, combinedVelocity.z);
     }
 
     private void OnDisable() => moveAction.Disable();
