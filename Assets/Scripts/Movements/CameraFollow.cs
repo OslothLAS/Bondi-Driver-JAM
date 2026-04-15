@@ -2,26 +2,25 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
-    public Transform target; // Arrastrá acá tu Bondi
-    public Vector3 offset;   // La distancia entre la cámara y el bus
-    public float smoothSpeed = 0.125f; // Para que el seguimiento sea suave
+    [Header("Objetivo")]
+    [SerializeField] private Transform target;
 
-    void Start()
-    {
-        // Si no configuraste el offset, calculamos el actual automáticamente
-        if (offset == Vector3.zero)
-            offset = transform.position - target.position;
-    }
+    [Header("Configuración")]
+    public Vector3 offset = new Vector3(0, 12, -10);
+    public float smoothSpeed = 0.125f;
+    public Vector3 fixedRotation = new Vector3(45, 0, 0);
+
+    public void SetTarget(Transform newTarget) => target = newTarget;
 
     void LateUpdate()
     {
-        // Calculamos la posición deseada (posición del bus + la distancia guardada)
+        if (target == null) return;
+
+        // Seguimiento de posición con Lerp
         Vector3 desiredPosition = target.position + offset;
+        transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
 
-        // Movemos la cámara suavemente hacia esa posición
-        Vector3 smoothedPosition = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
-        transform.position = smoothedPosition;
-
-        // La rotación ni la tocamos, así que se queda quieta
+        // Bloqueo de rotación para que no gire con el bondi
+        transform.rotation = Quaternion.Euler(fixedRotation);
     }
 }
