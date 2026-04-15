@@ -60,6 +60,20 @@ public class PassengerController : MonoBehaviour
         return maxCapacity - confirmedPassengers;
     }
 
+    public int GetCurrentPassengers()
+    {
+        return confirmedPassengers;
+    }
+
+    public void RemovePending(int count)
+    {
+        if (confirmedPassengers >= count)
+        {
+            confirmedPassengers -= count;
+            UpdateUI();
+        }
+    }
+
     private void UpdateUI()
     {
         if (passengerUI != null)
