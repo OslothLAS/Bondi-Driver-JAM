@@ -6,20 +6,30 @@ public class ParadaController : MonoBehaviour
     [Header("Configuracion de Parada")]
     [Tooltip("Cantidad de personas esperando en esta parada")]
     public int pasajerosEnParada = 5;
-    [Tooltip("Segundos que tarda en subir cada pasajero")]
+    [Tooltip("Segundos que tarda en subir/bajar cada pasajero")]
     public float tiempoPorPasajero = 1.0f;
+
+    [Header("Configuracion de Destino")]
+    [Tooltip("Si esta activo, es una parada de destino donde bajan todos los pasajeros")]
+    public bool esDestino = false;
 
     [Header("Configuracion de Materiales")]
     public Material materialCeleste;
     public Material materialVerde;
 
+    [Header("Referencia Spawner")]
+    [HideInInspector] public ParadaSpawner spawner;
+
     private MeshRenderer meshRenderer;
     private PassengerController busActual;
     private Coroutine boardingCoroutine;
+    private bool spawnHizoEnSalida = false;
 
     void Awake()
     {
         meshRenderer = GetComponent<MeshRenderer>();
+        spawner = GetComponentInParent<ParadaSpawner>();
+        ResetParada();
     }
 
     // --- ENTRADA ---
@@ -32,7 +42,7 @@ public class ParadaController : MonoBehaviour
 
     private void AlEntrar(GameObject obj)
     {
-        // Si ya hay un bus en proceso de subida, ignoramos otros colisionadores del mismo bus
+        Debug.Log("AlEntrar");
         if (busActual != null) return;
 
         PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
@@ -40,9 +50,12 @@ public class ParadaController : MonoBehaviour
         {
             busActual = pc;
             CambiarMaterial(materialVerde);
-            
-            // Iniciar la subida si hay gente y espacio
-            if (pasajerosEnParada > 0 && busActual.GetRemainingCapacity() > 0)
+
+            if (esDestino)
+            {
+                boardingCoroutine = StartCoroutine(BajadaPasajerosProcedimiento());
+            }
+            else if (pasajerosEnParada > 0 && busActual.GetRemainingCapacity() > 0)
             {
                 boardingCoroutine = StartCoroutine(SubidaPasajerosProcedimiento());
             }
@@ -53,11 +66,9 @@ public class ParadaController : MonoBehaviour
     {
         if (busActual != null)
         {
-            // Verificamos que sea el mismo bus el que sale
             PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
             if (pc == busActual)
             {
-                // Interrumpir subida si estaba en curso
                 if (boardingCoroutine != null)
                 {
                     StopCoroutine(boardingCoroutine);
@@ -65,8 +76,17 @@ public class ParadaController : MonoBehaviour
                     busActual.ClearPending();
                 }
 
-                busActual.SetStatusText(""); // Limpiamos el texto al salir
+                busActual.SetStatusText("");
                 CambiarMaterial(materialCeleste);
+
+                if (spawner != null && !spawnHizoEnSalida)
+                {
+                    int capacidadRestante = busActual.GetRemainingCapacity();
+                    bool fueCompletada = pasajerosEnParada == 0;
+                    spawner.OnParadaDesocupada(this, capacidadRestante, fueCompletada);
+                }
+
+                spawnHizoEnSalida = false;
                 busActual = null;
             }
         }
@@ -74,7 +94,8 @@ public class ParadaController : MonoBehaviour
 
     private IEnumerator SubidaPasajerosProcedimiento()
     {
-        // Calculamos cuantos pueden subir antes de empezar
+        spawnHizoEnSalida = false;
+
         int capacidadDisponible = busActual.GetRemainingCapacity();
         int aSubir = Mathf.Min(pasajerosEnParada, capacidadDisponible);
         int subidosActualmente = 0;
@@ -83,11 +104,11 @@ public class ParadaController : MonoBehaviour
         {
             // Verificamos si el bus sigue ahi antes de actualizar el texto
             if (busActual == null) break;
-            
+
             busActual.SetStatusText($"Subiendo... {aSubir - subidosActualmente} restantes");
 
             yield return new WaitForSeconds(tiempoPorPasajero);
-            
+
             // Verificamos de nuevo despues de la espera de 1 segundo
             if (busActual == null) break;
 
@@ -101,7 +122,42 @@ public class ParadaController : MonoBehaviour
             busActual.SetStatusText("Listo");
             busActual.CommitPending();
             pasajerosEnParada -= subidosActualmente;
-            Debug.Log($"Abordaje exitoso. Pasajeros restantes en parada: {pasajerosEnParada}");
+            spawnHizoEnSalida = true;
+            Debug.Log($"Abordaje completo. Pasajeros restantes en parada: {pasajerosEnParada}");
+
+            if (spawner != null)
+            {
+                int capacidadRestante = busActual.GetRemainingCapacity();
+                spawner.OnParadaDesocupada(this, capacidadRestante, subidosActualmente > 0);
+            }
+        }
+
+        boardingCoroutine = null;
+    }
+
+    private IEnumerator BajadaPasajerosProcedimiento()
+    {
+        int pasajerosABajar = busActual.GetCurrentPassengers();
+
+        while (pasajerosABajar > 0)
+        {
+            if (busActual == null) break;
+
+            busActual.SetStatusText($"Bajando... {pasajerosABajar} restantes");
+
+            yield return new WaitForSeconds(tiempoPorPasajero);
+
+            if (busActual == null) break;
+
+            pasajerosABajar--;
+            busActual.RemovePending(1);
+        }
+
+        if (busActual != null)
+        {
+            busActual.SetStatusText("Listo");
+            busActual.CommitPending();
+            Debug.Log($"Bajada completa. Pasajeros restantes en bus: {busActual.GetCurrentPassengers()}");
         }
 
         boardingCoroutine = null;
@@ -113,5 +169,11 @@ public class ParadaController : MonoBehaviour
         {
             meshRenderer.material = nuevoMaterial;
         }
+    }
+
+    public void ResetParada()
+    {
+        spawnHizoEnSalida = false;
+        pasajerosEnParada = UnityEngine.Random.Range(2, 9);
     }
 }
