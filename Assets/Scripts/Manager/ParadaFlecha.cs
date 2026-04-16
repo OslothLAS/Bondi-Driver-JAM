@@ -7,7 +7,7 @@ public class ParadaFlecha : MonoBehaviour
     public ParadaSpawner spawner;
 
     private GameObject flechaActual;
-    private bool mostrandoFlecha = false;
+    private bool flechaActiva = false;
 
     void Start()
     {
@@ -21,23 +21,27 @@ public class ParadaFlecha : MonoBehaviour
         if (flechaPrefab != null)
         {
             flechaActual = Instantiate(flechaPrefab, bondi.position, Quaternion.identity);
+            AplicarMaterialHolografico();
             flechaActual.SetActive(false);
+        }
+    }
 
-            Renderer rend = flechaActual.GetComponent<Renderer>();
-            if (rend != null)
-            {
-                Material mat = new Material(rend.material);
-                mat.SetFloat("_Mode", 3);
-                mat.SetColor("_Color", new Color(0f, 1f, 1f, 0.5f));
-                mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                mat.SetFloat("_ZWrite", 0);
-                mat.DisableKeyword("_ALPHATEST_ON");
-                mat.EnableKeyword("_ALPHABLEND_ON");
-                mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                mat.renderQueue = 3000;
-                rend.material = mat;
-            }
+    void AplicarMaterialHolografico()
+    {
+        Renderer rend = flechaActual.GetComponent<Renderer>();
+        if (rend != null)
+        {
+            Material mat = new Material(rend.material);
+            mat.SetFloat("_Mode", 3);
+            mat.SetColor("_Color", new Color(0f, 1f, 1f, 0.5f));
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.renderQueue = 3000;
+            rend.material = mat;
         }
     }
 
@@ -68,42 +72,33 @@ public class ParadaFlecha : MonoBehaviour
             }
             OcultarFlecha();
         }
-
-        if (mostrandoFlecha)
-        {
-            float speed = 30f * Time.deltaTime;
-            flechaActual.transform.RotateAround(bondi.position, Vector3.up, speed);
-
-            Vector3 dir = flechaActual.transform.position - bondi.position;
-            dir.y = 0;
-            if (dir.magnitude > 0.1f)
-            {
-                flechaActual.transform.rotation = Quaternion.LookRotation(dir);
-            }
-        }
     }
 
     void MostrarFlechaHacia(Vector3 targetPos)
     {
         Vector3 dir = targetPos - bondi.position;
         float distancia = dir.magnitude;
+        dir.y = 0;
         dir.Normalize();
 
-        Vector3 pos = bondi.position + Vector3.up * 2f;
-        flechaActual.transform.position = pos;
+        Vector3 posBonda = bondi.position;
+        posBonda.y += 3f;
+        flechaActual.transform.position = posBonda;
+
         flechaActual.transform.rotation = Quaternion.LookRotation(dir);
 
-        float escala = Mathf.Lerp(0.5f, 1.5f, Mathf.Clamp01(distancia / 100f));
+        float escala = Mathf.Lerp(1f, 2f, Mathf.Clamp01(distancia / 500f));
         flechaActual.transform.localScale = Vector3.one * escala;
 
         flechaActual.SetActive(true);
-        mostrandoFlecha = true;
+        flechaActiva = true;
     }
 
     void OcultarFlecha()
     {
-        flechaActual.SetActive(false);
-        mostrandoFlecha = false;
+        if (flechaActual != null)
+            flechaActual.SetActive(false);
+        flechaActiva = false;
     }
 
     ParadaController GetParadaActiva()

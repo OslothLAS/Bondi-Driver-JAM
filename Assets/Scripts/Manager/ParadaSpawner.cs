@@ -25,7 +25,9 @@ public class ParadaSpawner : MonoBehaviour
         }
 
         Debug.Log($"ParadaSpawner Start - Paradas encontradas: {todasLasParadas.Count}");
-        
+
+        OcultarTodasLasParadas(true);
+
         ParadaController destino = ObtenerParadaDestino();
         if (destino != null)
         {
