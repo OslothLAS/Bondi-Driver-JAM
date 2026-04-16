@@ -11,19 +11,40 @@ public class ParadaFlecha : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("=== ParadaFlecha Start ===");
+
         if (bondi == null)
         {
             GameObject bondiObj = GameObject.FindGameObjectWithTag("Player");
             if (bondiObj != null)
+            {
                 bondi = bondiObj.transform;
+                Debug.Log($"Bondi encontrado: {bondi.name}");
+            }
+            else
+            {
+                Debug.LogError("NO se encontro Bondi con tag Player!");
+            }
+        }
+        else
+        {
+            Debug.Log($"Bondi ya asignado: {bondi.name}");
         }
 
         if (flechaPrefab != null)
         {
+            Debug.Log($"Instanciando prefab: {flechaPrefab.name}");
             flechaActual = Instantiate(flechaPrefab, bondi.position, Quaternion.identity);
+            Debug.Log($"flechaActual instanciado: {flechaActual.name}, activeSelf: {flechaActual.activeSelf}");
             AplicarMaterialHolografico();
-            flechaActual.SetActive(false);
         }
+        else
+        {
+            Debug.LogError("flechaPrefab es NULL!");
+        }
+
+        Debug.Log($"spawner: {spawner != null}");
+        Debug.Log("=== Fin Start ===");
     }
 
     void AplicarMaterialHolografico()
@@ -47,51 +68,70 @@ public class ParadaFlecha : MonoBehaviour
 
     void LateUpdate()
     {
+        Debug.Log($"=== LateUpdate === flechaActual:{flechaActual != null} bondi:{bondi != null} spawner:{spawner != null}");
+
         if (flechaActual == null || bondi == null || spawner == null)
+        {
+            Debug.LogWarning("Saliendo por null check");
             return;
+        }
 
         ParadaController paradaActiva = GetParadaActiva();
+        Debug.Log($"paradaActiva: {paradaActiva?.name ?? "null"}");
 
         if (paradaActiva != null)
         {
+            Debug.Log("Mostrando hacia parada activa");
             MostrarFlechaHacia(paradaActiva.transform.position);
         }
         else
         {
             PassengerController pc = bondi.GetComponent<PassengerController>();
-            int capacidad = pc != null ? pc.GetRemainingCapacity() : 0;
+            int capacidad = pc != null ? pc.GetRemainingCapacity() : -1;
+            Debug.Log($"capacidad: {capacidad}");
 
-            if (capacidad <= 0)
+            ParadaController destino = spawner.ObtenerParadaDestino();
+            bool destinoActivo = destino != null && destino.gameObject.activeSelf;
+            Debug.Log($"destino: {destino?.name ?? "null"}, activo: {destinoActivo}");
+
+            if (capacidad <= 0 && destinoActivo)
             {
-                ParadaController destino = spawner.ObtenerParadaDestino();
-                if (destino != null && destino.gameObject.activeSelf)
-                {
-                    MostrarFlechaHacia(destino.transform.position);
-                    return;
-                }
+                Debug.Log("Caso 1: capacidad 0 y destino activo");
+                MostrarFlechaHacia(destino.transform.position);
             }
-            OcultarFlecha();
+            else if (destinoActivo)
+            {
+                Debug.Log("Caso 2: destino activo (sin estar lleno)");
+                MostrarFlechaHacia(destino.transform.position);
+            }
+            else
+            {
+                Debug.Log("Caso 3: ocultando flecha");
+                OcultarFlecha();
+            }
         }
     }
 
     void MostrarFlechaHacia(Vector3 targetPos)
     {
+        Debug.Log($"=== MostrarFlechaHacia === target: {targetPos}");
+        Debug.Log($"Bondi pos: {bondi.position}");
+
         Vector3 dir = targetPos - bondi.position;
-        float distancia = dir.magnitude;
         dir.y = 0;
         dir.Normalize();
+        Debug.Log($"Dir normalizada: {dir}");
 
-        Vector3 posBonda = bondi.position;
+        Vector3 posBonda = bondi.position + bondi.forward * 500f;
         posBonda.y += 3f;
+        Debug.Log($"Nueva pos: {posBonda}");
+
         flechaActual.transform.position = posBonda;
-
         flechaActual.transform.rotation = Quaternion.LookRotation(dir);
-
-        float escala = Mathf.Lerp(1f, 2f, Mathf.Clamp01(distancia / 500f));
-        flechaActual.transform.localScale = Vector3.one * escala;
-
         flechaActual.SetActive(true);
         flechaActiva = true;
+
+        Debug.Log($"Flecha activada. activeSelf: {flechaActual.activeSelf}");
     }
 
     void OcultarFlecha()
