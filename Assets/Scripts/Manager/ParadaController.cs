@@ -42,22 +42,34 @@ public class ParadaController : MonoBehaviour
 
     private void AlEntrar(GameObject obj)
     {
-        Debug.Log("AlEntrar");
-        if (busActual != null) return;
-
+        // 1. Buscamos el componente PassengerController primero
         PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
+
         if (pc != null)
         {
-            busActual = pc;
-            CambiarMaterial(materialVerde);
+            // 2. Filtramos por nombre del GameObject que tiene el script (el padre usualmente)
+            string nombreBondi = pc.gameObject.name;
 
-            if (esDestino)
+            if (nombreBondi == "Bondi_J1" || nombreBondi == "Bondi_J2")
             {
-                boardingCoroutine = StartCoroutine(BajadaPasajerosProcedimiento());
+                if (busActual != null) return;
+
+                Debug.Log($"Entró el bondi permitido: {nombreBondi}");
+                busActual = pc;
+                CambiarMaterial(materialVerde);
+
+                if (esDestino)
+                {
+                    boardingCoroutine = StartCoroutine(BajadaPasajerosProcedimiento());
+                }
+                else if (pasajerosEnParada > 0 && busActual.GetRemainingCapacity() > 0)
+                {
+                    boardingCoroutine = StartCoroutine(SubidaPasajerosProcedimiento());
+                }
             }
-            else if (pasajerosEnParada > 0 && busActual.GetRemainingCapacity() > 0)
+            else
             {
-                boardingCoroutine = StartCoroutine(SubidaPasajerosProcedimiento());
+                Debug.Log($"Objeto con PassengerController detectado ({nombreBondi}), pero NO es un bondi permitido.");
             }
         }
     }
@@ -66,9 +78,12 @@ public class ParadaController : MonoBehaviour
     {
         if (busActual != null)
         {
+            // Chequeamos de la misma forma para asegurarnos que el que sale es el que estaba adentro
             PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
-            if (pc == busActual)
+
+            if (pc != null && pc == busActual)
             {
+                // No hace falta re-chequear el nombre porque busActual ya fue filtrado al entrar
                 if (boardingCoroutine != null)
                 {
                     StopCoroutine(boardingCoroutine);
@@ -88,6 +103,7 @@ public class ParadaController : MonoBehaviour
 
                 spawnHizoEnSalida = false;
                 busActual = null;
+                Debug.Log("Bondi salió de la parada.");
             }
         }
     }
