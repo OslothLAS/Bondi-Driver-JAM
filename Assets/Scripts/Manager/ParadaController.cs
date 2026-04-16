@@ -78,73 +78,60 @@ public class ParadaController : MonoBehaviour
     {
         if (busActual != null)
         {
-            // Chequeamos de la misma forma para asegurarnos que el que sale es el que estaba adentro
             PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
-
             if (pc != null && pc == busActual)
             {
-                // No hace falta re-chequear el nombre porque busActual ya fue filtrado al entrar
                 if (boardingCoroutine != null)
                 {
                     StopCoroutine(boardingCoroutine);
                     boardingCoroutine = null;
-                    busActual.ClearPending();
+
+                    // CAMBIO CLAVE: En lugar de borrar (Clear), confirmamos (Commit) 
+                    // lo que haya llegado a subir hasta este frame.
+                    busActual.CommitPending();
                 }
 
                 busActual.SetStatusText("");
                 CambiarMaterial(materialCeleste);
 
-                if (spawner != null && !spawnHizoEnSalida)
-                {
-                    int capacidadRestante = busActual.GetRemainingCapacity();
-                    bool fueCompletada = pasajerosEnParada == 0;
-                    spawner.OnParadaDesocupada(this, capacidadRestante, fueCompletada);
-                }
-
-                spawnHizoEnSalida = false;
+                // Ya no llamamos al spawner acá para que la parada no desaparezca 
+                // si todavía quedan pasajeros esperando.
                 busActual = null;
-                Debug.Log("Bondi salió de la parada.");
             }
         }
     }
-
     private IEnumerator SubidaPasajerosProcedimiento()
     {
-        spawnHizoEnSalida = false;
-
         int capacidadDisponible = busActual.GetRemainingCapacity();
         int aSubir = Mathf.Min(pasajerosEnParada, capacidadDisponible);
         int subidosActualmente = 0;
 
         while (subidosActualmente < aSubir)
         {
-            // Verificamos si el bus sigue ahi antes de actualizar el texto
             if (busActual == null) break;
 
             busActual.SetStatusText($"Subiendo... {aSubir - subidosActualmente} restantes");
 
             yield return new WaitForSeconds(tiempoPorPasajero);
 
-            // Verificamos de nuevo despues de la espera de 1 segundo
             if (busActual == null) break;
 
+            // --- PROCESAMIENTO ATÓMICO ---
             subidosActualmente++;
-            busActual.AddPending(1);
+            pasajerosEnParada--; // Restamos de la parada inmediatamente
+            busActual.AddPending(1); // Sumamos al bondi (como pendiente)
         }
 
-        // Si llegamos aqui y el bus sigue siendo valido
         if (busActual != null)
         {
             busActual.SetStatusText("Listo");
             busActual.CommitPending();
-            pasajerosEnParada -= subidosActualmente;
-            spawnHizoEnSalida = true;
-            Debug.Log($"Abordaje completo. Pasajeros restantes en parada: {pasajerosEnParada}");
 
-            if (spawner != null)
+            // Si la parada se quedó sin gente (pasajerosEnParada == 0), 
+            // recién ahí le avisamos al spawner que cambie de parada.
+            if (pasajerosEnParada <= 0 && spawner != null)
             {
-                int capacidadRestante = busActual.GetRemainingCapacity();
-                spawner.OnParadaDesocupada(this, capacidadRestante, subidosActualmente > 0);
+                spawner.OnParadaDesocupada(this, busActual.GetRemainingCapacity(), true);
             }
         }
 
