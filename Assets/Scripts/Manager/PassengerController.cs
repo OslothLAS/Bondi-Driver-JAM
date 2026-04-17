@@ -4,7 +4,7 @@ using TMPro;
 public class PassengerController : MonoBehaviour
 {
     [Header("Configuracion de Capacidad")]
-    public int maxCapacity = 30;
+    public int maxCapacity = 10;
 
     [Header("Configuracion de Puntos")]
     [Tooltip("Puntos otorgados por cada pasajero que llega a destino")]
@@ -14,7 +14,7 @@ public class PassengerController : MonoBehaviour
     [Header("UI Reference")]
     public TMP_Text passengerUI;
     public TMP_Text statusUI;
-    public TMP_Text scoreUI; // Nuevo: Arrastrá acá el texto del puntaje
+    public TMP_Text scoreUI; // Nuevo: Arrastrï¿½ acï¿½ el texto del puntaje
 
     private int confirmedPassengers = 0;
     private int pendingPassengers = 0;
@@ -102,6 +102,6 @@ public class PassengerController : MonoBehaviour
         }
     }
 
-    // Agregá esto en PassengerController.cs para que el GameManager pueda leer los puntos
+    // Agregï¿½ esto en PassengerController.cs para que el GameManager pueda leer los puntos
     public int GetScore() => currentScore;
 }

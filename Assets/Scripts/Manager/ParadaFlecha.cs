@@ -3,53 +3,41 @@ using UnityEngine;
 public class ParadaFlecha : MonoBehaviour
 {
     public GameObject flechaPrefab;
-    public Transform bondi;
+    public Transform bondi1;
+    public Transform bondi2;
     public ParadaSpawner spawner;
 
-    private GameObject flechaActual;
-    private bool flechaActiva = false;
+    private GameObject flecha1;
+    private GameObject flecha2;
 
     void Start()
     {
-        Debug.Log("=== ParadaFlecha Start ===");
-
-        if (bondi == null)
+        if (bondi1 == null)
         {
-            GameObject bondiObj = GameObject.FindGameObjectWithTag("Player");
-            if (bondiObj != null)
-            {
-                bondi = bondiObj.transform;
-                Debug.Log($"Bondi encontrado: {bondi.name}");
-            }
-            else
-            {
-                Debug.LogError("NO se encontro Bondi con tag Player!");
-            }
+            GameObject b1 = GameObject.Find("Bondi_J1");
+            if (b1 != null) bondi1 = b1.transform;
         }
-        else
+        if (bondi2 == null)
         {
-            Debug.Log($"Bondi ya asignado: {bondi.name}");
+            GameObject b2 = GameObject.Find("Bondi_J2");
+            if (b2 != null) bondi2 = b2.transform;
         }
 
         if (flechaPrefab != null)
         {
-            Debug.Log($"Instanciando prefab: {flechaPrefab.name}");
-            flechaActual = Instantiate(flechaPrefab, bondi.position, Quaternion.identity);
-            Debug.Log($"flechaActual instanciado: {flechaActual.name}, activeSelf: {flechaActual.activeSelf}");
-            AplicarMaterialHolografico();
+            if (bondi1 != null) flecha1 = CrearFlecha(bondi1);
+            if (bondi2 != null) flecha2 = CrearFlecha(bondi2);
         }
         else
         {
             Debug.LogError("flechaPrefab es NULL!");
         }
-
-        Debug.Log($"spawner: {spawner != null}");
-        Debug.Log("=== Fin Start ===");
     }
 
-    void AplicarMaterialHolografico()
+    GameObject CrearFlecha(Transform target)
     {
-        Renderer rend = flechaActual.GetComponent<Renderer>();
+        GameObject flecha = Instantiate(flechaPrefab, target.position, Quaternion.identity);
+        Renderer rend = flecha.GetComponent<Renderer>();
         if (rend != null)
         {
             Material mat = new Material(rend.material);
@@ -64,93 +52,54 @@ public class ParadaFlecha : MonoBehaviour
             mat.renderQueue = 3000;
             rend.material = mat;
         }
+        return flecha;
     }
 
     void LateUpdate()
     {
-        Debug.Log($"=== LateUpdate === flechaActual:{flechaActual != null} bondi:{bondi != null} spawner:{spawner != null}");
-
-        if (flechaActual == null || bondi == null || spawner == null)
-        {
-            Debug.LogWarning("Saliendo por null check");
-            return;
-        }
-
         ParadaController paradaActiva = GetParadaActiva();
-        Debug.Log($"paradaActiva: {paradaActiva?.name ?? "null"}");
 
         if (paradaActiva != null)
         {
-            Debug.Log("Mostrando hacia parada activa");
-            MostrarFlechaHacia(paradaActiva.transform.position);
+            if (flecha1 != null && bondi1 != null)
+                MostrarFlechaHacia(flecha1, bondi1, paradaActiva.transform.position);
+            if (flecha2 != null && bondi2 != null)
+                MostrarFlechaHacia(flecha2, bondi2, paradaActiva.transform.position);
         }
         else
         {
-            PassengerController pc = bondi.GetComponent<PassengerController>();
-            int capacidad = pc != null ? pc.GetRemainingCapacity() : -1;
-            Debug.Log($"capacidad: {capacidad}");
-
-            ParadaController destino = spawner.ObtenerParadaDestino();
-            bool destinoActivo = destino != null && destino.gameObject.activeSelf;
-            Debug.Log($"destino: {destino?.name ?? "null"}, activo: {destinoActivo}");
-
-            if (capacidad <= 0 && destinoActivo)
-            {
-                Debug.Log("Caso 1: capacidad 0 y destino activo");
-                MostrarFlechaHacia(destino.transform.position);
-            }
-            else if (destinoActivo)
-            {
-                Debug.Log("Caso 2: destino activo (sin estar lleno)");
-                MostrarFlechaHacia(destino.transform.position);
-            }
-            else
-            {
-                Debug.Log("Caso 3: ocultando flecha");
-                OcultarFlecha();
-            }
+            if (flecha1 != null) flecha1.SetActive(false);
+            if (flecha2 != null) flecha2.SetActive(false);
         }
     }
 
-    void MostrarFlechaHacia(Vector3 targetPos)
+    void MostrarFlechaHacia(GameObject flecha, Transform bondi, Vector3 targetPos)
     {
-        Debug.Log($"=== MostrarFlechaHacia === target: {targetPos}");
-        Debug.Log($"Bondi pos: {bondi.position}");
-
         Vector3 dir = targetPos - bondi.position;
         dir.y = 0;
         dir.Normalize();
-        Debug.Log($"Dir normalizada: {dir}");
 
-        Vector3 posBonda = bondi.position + bondi.forward * 500f;
+        Vector3 posBonda = bondi.position + bondi.forward * 48f;
         posBonda.y += 3f;
-        Debug.Log($"Nueva pos: {posBonda}");
 
-        flechaActual.transform.position = posBonda;
-        flechaActual.transform.rotation = Quaternion.LookRotation(dir);
-        flechaActual.SetActive(true);
-        flechaActiva = true;
-
-        Debug.Log($"Flecha activada. activeSelf: {flechaActual.activeSelf}");
-    }
-
-    void OcultarFlecha()
-    {
-        if (flechaActual != null)
-            flechaActual.SetActive(false);
-        flechaActiva = false;
+        flecha.transform.position = posBonda;
+        flecha.transform.rotation = Quaternion.LookRotation(dir);
+        flecha.SetActive(true);
     }
 
     ParadaController GetParadaActiva()
     {
-        if (spawner.ParadasActivas.Count > 0)
-            return spawner.ParadasActivas[0];
+        foreach (var parada in spawner.ParadasActivas)
+        {
+            if (parada != null && !parada.esDestino)
+                return parada;
+        }
         return null;
     }
 
     void OnDestroy()
     {
-        if (flechaActual != null)
-            Destroy(flechaActual);
+        if (flecha1 != null) Destroy(flecha1);
+        if (flecha2 != null) Destroy(flecha2);
     }
 }

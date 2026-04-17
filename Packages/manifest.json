@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.atteneder.gltfast": "file:C:/Users/fran9/Downloads/glTFast-com.atteneder.gltfast-6.18.0",
     "com.unity.ai.navigation": "2.0.12",
     "com.unity.collab-proxy": "2.12.4",
     "com.unity.formats.fbx": "5.1.5",
