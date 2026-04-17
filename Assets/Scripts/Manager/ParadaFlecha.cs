@@ -2,10 +2,20 @@ using UnityEngine;
 
 public class ParadaFlecha : MonoBehaviour
 {
+    [Header("Prefab y Referencias")]
     public GameObject flechaPrefab;
     public Transform bondi1;
     public Transform bondi2;
     public ParadaSpawner spawner;
+
+    [Header("Posicion de la Flecha")]
+    [Tooltip("Distancia hacia adelante desde el bondi")]
+    public float distanciaAdelante = 48f;
+    [Tooltip("Altura extra sobre el bondi")]
+    public float alturaExtra = 3f;
+
+    [Header("Color de la Flecha")]
+    public Color colorFlecha = new Color(0f, 1f, 1f, 0.5f);
 
     private GameObject flecha1;
     private GameObject flecha2;
@@ -42,7 +52,7 @@ public class ParadaFlecha : MonoBehaviour
         {
             Material mat = new Material(rend.material);
             mat.SetFloat("_Mode", 3);
-            mat.SetColor("_Color", new Color(0f, 1f, 1f, 0.5f));
+            mat.SetColor("_Color", colorFlecha);
             mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
             mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             mat.SetFloat("_ZWrite", 0);
@@ -79,11 +89,11 @@ public class ParadaFlecha : MonoBehaviour
         dir.y = 0;
         dir.Normalize();
 
-        Vector3 posBonda = bondi.position + bondi.forward * 48f;
-        posBonda.y += 3f;
+        Vector3 posBonda = bondi.position + bondi.forward * distanciaAdelante;
+        posBonda.y += alturaExtra;
 
         flecha.transform.position = posBonda;
-        flecha.transform.rotation = Quaternion.LookRotation(dir);
+        flecha.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-90f, 0f, 0f);
         flecha.SetActive(true);
     }
 
