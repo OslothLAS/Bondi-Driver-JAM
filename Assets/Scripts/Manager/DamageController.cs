@@ -1,121 +1,156 @@
 using UnityEngine;
 using TMPro;
-using System.Collections;
 
 public class DamageController : MonoBehaviour
 {
-    [Header("Referencias UI")]
-    public TMP_Text collisionText;
+    [Header("Configuración de Choques")]
+    public int maxChoquesParaRespawn = 5;
+    public float cooldownTime = 1.5f;
 
-    [Header("Configuración de Daño")]
-    public int maxCollisions = 10;
-    public float cooldownTime = 1f;
-    private float nextCollisionTime = 0f;
-    private int collisionCount = 0;
+    [Header("Efectos de Explosión")]
+    public GameObject prefabExplosion;
+    public float tiempoVidaExplosion = 2.5f;
 
-    [Header("Configuración de Respawn")]
+    [Header("Sistemas de Humo (En Jerarquía)")]
+    [Tooltip("El objeto del humo blanco/gris gradual")]
+    public GameObject objetoHumoBlanco;
+    [Tooltip("El objeto del humo crítico")]
+    public GameObject objetoHumoCritico;
+
+    [Header("Configuración Humo Blanco")]
+    public float maximaEmisionBlanco = 60f;
+    public Color colorHumoInicial = new Color(0.8f, 0.8f, 0.8f, 0.2f);
+    public Color colorHumoFinal = new Color(0.3f, 0.3f, 0.3f, 0.9f);
+
+    [Header("Referencias de UI y Respawn")]
+    public TMP_Text contadorChoquesUI;
     public Transform respawnPoint;
-    public float flickerDuration = 2f;
-    public float flickerSpeed = 0.1f;
-    public GameObject efectoExplosion; // Opcional: Prefab de partículas de explosión
 
-    private Rigidbody rb;
-    private Renderer[] myRenderers;
-    private PassengerController passengerController; // Referencia al otro script
+    private int choquesActualesVida = 0;
+    private int totalChoquesPartida = 0;
+    private float nextCollisionTime = 0f;
+
+    // Para controlar las partículas del humo blanco cuando esté activo
+    private ParticleSystem psBlanco;
+    private ParticleSystem.EmissionModule emissionBlanco;
 
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        myRenderers = GetComponentsInChildren<Renderer>();
+        // Setup inicial de componentes
+        if (objetoHumoBlanco != null)
+        {
+            psBlanco = objetoHumoBlanco.GetComponent<ParticleSystem>();
+            if (psBlanco != null) emissionBlanco = psBlanco.emission;
 
-        // Buscamos el componente de pasajeros en este mismo objeto
-        passengerController = GetComponent<PassengerController>();
+            objetoHumoBlanco.SetActive(true); // Empezamos con el blanco prendido
+            if (psBlanco != null) emissionBlanco.rateOverTime = 0f;
+        }
+
+        if (objetoHumoCritico != null) objetoHumoCritico.SetActive(false);
 
         UpdateUI();
     }
 
-    // Dentro de DamageController.cs agregá esto:
-
-    private int totalCollisionsAcumuladas = 0; // El contador que nunca vuelve a cero
-
-    // Modificá el OnCollisionEnter
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Ground")) return;
         if (Time.time < nextCollisionTime) return;
 
-        collisionCount++;
-        totalCollisionsAcumuladas++; // <-- Sumamos al total de la partida
+        choquesActualesVida++;
+        totalChoquesPartida++;
         nextCollisionTime = Time.time + cooldownTime;
+
+        GestionarFasesDeHumo();
         UpdateUI();
 
-        if (collisionCount >= maxCollisions)
+        if (choquesActualesVida >= maxChoquesParaRespawn)
         {
+            GenerarExplosion();
             Respawn();
         }
     }
 
-    // Agregá esta función pública al final para que el GameManager la use
-    public int GetTotalChoques()
+    void GestionarFasesDeHumo()
     {
-        return totalCollisionsAcumuladas;
-    }
+        float umbralCritico = maxChoquesParaRespawn * 0.9f;
 
-
-
-    private void Respawn()
-    {
-        // 1. Efecto visual de explosión (opcional)
-        if (efectoExplosion != null)
+        // --- ESTADO CRÍTICO (90% de daño) ---
+        if (choquesActualesVida >= umbralCritico && choquesActualesVida < maxChoquesParaRespawn)
         {
-            Instantiate(efectoExplosion, transform.position, Quaternion.identity);
+            // Apagamos el blanco, prendemos el crítico
+            if (objetoHumoBlanco != null) objetoHumoBlanco.SetActive(false);
+            if (objetoHumoCritico != null) objetoHumoCritico.SetActive(true);
         }
-
-        // 2. Lógica de Pasajeros: Vaciamos el bondi
-        if (passengerController != null)
+        // --- ESTADO GRADUAL (Normal) ---
+        else
         {
-            passengerController.PerderTodosLosPasajeros();
-        }
-
-        // 3. Resetear contador y teletransportar
-        collisionCount = 0;
-        UpdateUI();
-
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        transform.position = respawnPoint.position;
-        transform.rotation = respawnPoint.rotation;
-
-        StartCoroutine(FlickerEffect());
-    }
-
-    private IEnumerator FlickerEffect()
-    {
-        float timer = 0;
-        while (timer < flickerDuration)
-        {
-            foreach (var r in myRenderers)
+            // Aseguramos que el crítico esté apagado y el blanco prendido
+            if (objetoHumoCritico != null) objetoHumoCritico.SetActive(false);
+            if (objetoHumoBlanco != null)
             {
-                if (r != null) r.enabled = !r.enabled;
+                objetoHumoBlanco.SetActive(true);
+                ActualizarEmisionBlanca();
             }
-            yield return new WaitForSeconds(flickerSpeed);
-            timer += flickerSpeed;
-        }
-
-        foreach (var r in myRenderers)
-        {
-            if (r != null) r.enabled = true;
         }
     }
 
-    private void UpdateUI()
+    void ActualizarEmisionBlanca()
     {
-        if (collisionText != null)
+        if (psBlanco == null) return;
+
+        float damageRatio = Mathf.Clamp01((float)choquesActualesVida / maxChoquesParaRespawn);
+
+        // Aplicamos la lógica de emisión y color que veníamos usando
+        emissionBlanco.rateOverTime = damageRatio * maximaEmisionBlanco;
+
+        var main = psBlanco.main;
+        main.startColor = Color.Lerp(colorHumoInicial, colorHumoFinal, damageRatio);
+    }
+
+    void Respawn()
+    {
+        choquesActualesVida = 0;
+
+        // Al reaparecer: Volvemos al estado inicial (Blanco ON / Crítico OFF)
+        if (objetoHumoCritico != null) objetoHumoCritico.SetActive(false);
+        if (objetoHumoBlanco != null)
         {
-            collisionText.text = $"Choques: {collisionCount}/{maxCollisions}";
+            objetoHumoBlanco.SetActive(true);
+            ActualizarEmisionBlanca(); // Esto lo va a poner en 0 emisión por el reset de vida
+        }
+
+        if (respawnPoint != null)
+        {
+            transform.position = respawnPoint.position;
+            transform.rotation = respawnPoint.rotation;
+        }
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        UpdateUI();
+    }
+
+    void GenerarExplosion()
+    {
+        if (prefabExplosion != null)
+        {
+            GameObject exp = Instantiate(prefabExplosion, transform.position, Quaternion.identity);
+            Destroy(exp, tiempoVidaExplosion);
         }
     }
 
+    void UpdateUI()
+    {
+        if (contadorChoquesUI != null)
+        {
+            contadorChoquesUI.text = $"CHOQUES: {choquesActualesVida}/{maxChoquesParaRespawn}";
+        }
+    }
 
-
+    public int GetTotalChoques() => totalChoquesPartida;
 }

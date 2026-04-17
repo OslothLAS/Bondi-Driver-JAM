@@ -19,7 +19,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text puntosFinalesJ1;
     public TMP_Text puntosFinalesJ2;
 
-    [Header("Carteles/Paneles de Fin (Contienen los botones)")]
+    [Header("Carteles/Paneles de Fin")]
     public GameObject cartelGanadorJ1;
     public GameObject cartelGanadorJ2;
     public GameObject cartelEmpate;
@@ -29,17 +29,13 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // 1. Configuramos el tiempo inicial
         tiempoRestante = tiempoDePartidaMinutos * 60f;
-        Time.timeScale = 1f; // Nos aseguramos que el juego NO empiece pausado
+        Time.timeScale = 1f;
 
-        // 2. SEGURIDAD: Desactivamos todos los carteles y botones al iniciar
         if (cartelGanadorJ1) cartelGanadorJ1.SetActive(false);
         if (cartelGanadorJ2) cartelGanadorJ2.SetActive(false);
         if (cartelEmpate) cartelEmpate.SetActive(false);
 
-
-        // --- NUEVO: Desactivamos los textos de puntos finales ---
         if (puntosFinalesJ1 != null) puntosFinalesJ1.gameObject.SetActive(false);
         if (puntosFinalesJ2 != null) puntosFinalesJ2.gameObject.SetActive(false);
 
@@ -72,31 +68,45 @@ public class GameManager : MonoBehaviour
         int choquesJ1 = (damageJ1 != null) ? damageJ1.GetTotalChoques() : 0;
         int choquesJ2 = (damageJ2 != null) ? damageJ2.GetTotalChoques() : 0;
 
-        // --- NUEVO: Activamos los objetos antes de escribir en ellos ---
+        // --- UI DE PUNTOS FINALES ---
         if (puntosFinalesJ1 != null)
         {
             puntosFinalesJ1.gameObject.SetActive(true);
-            puntosFinalesJ1.text = $"Bondi 1: \nPuntos: {puntosJ1}\nChoques: {choquesJ1}";
+            puntosFinalesJ1.text = $"Puntos: {puntosJ1}\nChoques: {choquesJ1}";
         }
 
         if (puntosFinalesJ2 != null)
         {
             puntosFinalesJ2.gameObject.SetActive(true);
-            puntosFinalesJ2.text = $"Bondi 2: \nPuntos: {puntosJ2}\nChoques: {choquesJ2}";
+            puntosFinalesJ2.text = $"Puntos: {puntosJ2}\nChoques: {choquesJ2}";
         }
 
-        // Activación de los carteles de ganador (se mantiene igual)
+        // --- LÓGICA DE GANADOR CON DESEMPATE ---
         if (puntosJ1 > puntosJ2)
         {
-            if (cartelGanadorJ1) cartelGanadorJ1.SetActive(true);
+            cartelGanadorJ1.SetActive(true);
         }
         else if (puntosJ2 > puntosJ1)
         {
-            if (cartelGanadorJ2) cartelGanadorJ2.SetActive(true);
+            cartelGanadorJ2.SetActive(true);
         }
-        else
+        else // EMPATE EN PUNTOS: Desempate por menos choques
         {
-            if (cartelEmpate) cartelEmpate.SetActive(true);
+            if (choquesJ1 < choquesJ2) // J1 tiene menos choques
+            {
+                if (cartelGanadorJ1) cartelGanadorJ1.SetActive(true);
+                Debug.Log("Victoria para J1 por menos choques.");
+            }
+            else if (choquesJ2 < choquesJ1) // J2 tiene menos choques
+            {
+                if (cartelGanadorJ2) cartelGanadorJ2.SetActive(true);
+                Debug.Log("Victoria para J2 por menos choques.");
+            }
+            else // Empate exacto en puntos Y choques
+            {
+                if (cartelEmpate) cartelEmpate.SetActive(true);
+                Debug.Log("Empate absoluto.");
+            }
         }
 
         Time.timeScale = 0f;
