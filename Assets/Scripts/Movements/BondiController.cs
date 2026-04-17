@@ -42,8 +42,14 @@ public class BondiController : MonoBehaviour
 
     private Rigidbody rb;
     private InputAction moveAction;
+    private InputAction accelerateAction;
+    private InputAction brakeAction;
     private InputAction hornAction;
+    private InputAction steerAction;
     private Vector2 currentInput;
+    private float accelerateInput;
+    private float brakeInput;
+    private int gamepadIndex;
 
     void Awake()
     {
@@ -52,15 +58,28 @@ public class BondiController : MonoBehaviour
 
         if (playerIndex == 0)
         {
-            upKey = "<Keyboard>/w"; downKey = "<Keyboard>/s";
-            leftKey = "<Keyboard>/a"; rightKey = "<Keyboard>/d";
-            hornKey = "<Keyboard>/e";
+            Debug.Log($"Gamepad found: {gamepad.displayName}");
+        }
+
+        gamepadIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
+
+        steerAction = new InputAction("Steer");
+        accelerateAction = new InputAction("Accelerate");
+        brakeAction = new InputAction("Brake");
+        hornAction = new InputAction("Horn");
+
+        if (Gamepad.all.Count > gamepadIndex)
+        {
+            Gamepad gamepad = Gamepad.all[gamepadIndex];
+            Debug.Log($"[{gameObject.name}] Using gamepad: {gamepad.displayName}");
+            steerAction.AddBinding(gamepad.leftStick.x);
+            accelerateAction.AddBinding(gamepad.rightTrigger);
+            brakeAction.AddBinding(gamepad.leftTrigger);
+            hornAction.AddBinding(gamepad.buttonEast);
         }
         else
         {
-            upKey = "<Keyboard>/upArrow"; downKey = "<Keyboard>/downArrow";
-            leftKey = "<Keyboard>/leftArrow"; rightKey = "<Keyboard>/rightArrow";
-            hornKey = "<Keyboard>/oem1";
+            Debug.Log($"[{gameObject.name}] No gamepad {gamepadIndex} found. Use keyboard.");
         }
 
         // Configuración de Input Action Map
@@ -94,7 +113,13 @@ public class BondiController : MonoBehaviour
 
     void Update()
     {
-        currentInput = moveAction.ReadValue<Vector2>();
+        float steer = steerAction.ReadValue<float>();
+        accelerateInput = accelerateAction.ReadValue<float>();
+        brakeInput = brakeAction.ReadValue<float>();
+
+        Debug.Log($"[{gameObject.name}] GamepadIndex: {gamepadIndex}, Steer: {steer}, Accelerate: {accelerateInput}, Brake: {brakeInput}");
+
+        currentInput = new Vector2(steer, accelerateInput - brakeInput);
 
         // LÓGICA DE BOCINA (Logarítmica)
         if (hornAction.WasPressedThisFrame() && hornSound != null)
@@ -132,12 +157,10 @@ public class BondiController : MonoBehaviour
             anim.SetFloat("Giro", currentInput.x, 0.1f, Time.deltaTime);
         }
 
-        // LÓGICA DE PITCH DEL MOTOR
         if (engineSound != null)
         {
             float speed = rb.linearVelocity.magnitude;
             float speedRatio = Mathf.Clamp01(speed / maxSpeedForPitch);
-
             engineSound.pitch = Mathf.Lerp(minPitch, maxPitch, speedRatio);
             engineSound.volume = Mathf.Lerp(0.4f, 0.8f, speedRatio);
         }
@@ -192,6 +215,7 @@ public class BondiController : MonoBehaviour
             if (isDrifting && !driftSound.isPlaying)
             {
                 driftSound.loop = true;
+                driftSound.volume = 0.5f;
                 driftSound.Play();
             }
             else if (!isDrifting && driftSound.isPlaying)
@@ -215,7 +239,9 @@ public class BondiController : MonoBehaviour
 
     private void OnDisable()
     {
-        moveAction.Disable();
+        steerAction.Disable();
+        accelerateAction.Disable();
+        brakeAction.Disable();
         hornAction.Disable();
     }
 }
