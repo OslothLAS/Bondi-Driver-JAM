@@ -2,114 +2,132 @@ using UnityEngine;
 
 public class ParadaFlecha : MonoBehaviour
 {
-    [Header("Prefab y Referencias")]
-    public GameObject flechaPrefab;
+    [Header("Prefabs de Flechas")]
+    public GameObject prefabParada;
+    public GameObject prefabDestino;
+
+    [Header("Referencias de Jugadores")]
     public Transform bondi1;
     public Transform bondi2;
     public ParadaSpawner spawner;
 
-    [Header("Posicion de la Flecha")]
-    [Tooltip("Distancia hacia adelante desde el bondi")]
-    public float distanciaAdelante = 48f;
-    [Tooltip("Altura extra sobre el bondi")]
+    [Header("Configuracion de Orbita")]
+    public float orbitRadius = 5f;
+    public Vector3 ejeRotacion = Vector3.up;
     public float alturaExtra = 3f;
 
-    [Header("Color de la Flecha")]
-    public Color colorFlecha = new Color(0f, 1f, 1f, 0.5f);
+    [Header("Personalización de Colores")]
+    public Color colorParada = new Color(0f, 1f, 1f, 0.5f);
+    public Color colorDestino = new Color(1f, 0.8f, 0f, 0.5f);
 
-    private GameObject flecha1;
-    private GameObject flecha2;
+    // Referencias a los scripts de pasajeros (NUEVO)
+    private PassengerController pc1, pc2;
+
+    // Referencias internas de GameObjects
+    private GameObject fActual1, fActual2;
+    private GameObject fDestino1, fDestino2;
 
     void Start()
     {
-        if (bondi1 == null)
+        // 1. Buscamos bondis y sus PassengerControllers (NUEVO)
+        if (bondi1 == null) bondi1 = GameObject.Find("Bondi_J1")?.transform;
+        if (bondi2 == null) bondi2 = GameObject.Find("Bondi_J2")?.transform;
+
+        if (bondi1 != null) pc1 = bondi1.GetComponent<PassengerController>();
+        if (bondi2 != null) pc2 = bondi2.GetComponent<PassengerController>();
+
+        // 2. Instanciamos los prefabs
+        if (bondi1 != null)
         {
-            GameObject b1 = GameObject.Find("Bondi_J1");
-            if (b1 != null) bondi1 = b1.transform;
-        }
-        if (bondi2 == null)
-        {
-            GameObject b2 = GameObject.Find("Bondi_J2");
-            if (b2 != null) bondi2 = b2.transform;
+            if (prefabParada) fActual1 = CrearFlecha(bondi1, prefabParada, colorParada);
+            if (prefabDestino) fDestino1 = CrearFlecha(bondi1, prefabDestino, colorDestino);
         }
 
-        if (flechaPrefab != null)
+        if (bondi2 != null)
         {
-            if (bondi1 != null) flecha1 = CrearFlecha(bondi1);
-            if (bondi2 != null) flecha2 = CrearFlecha(bondi2);
-        }
-        else
-        {
-            Debug.LogError("flechaPrefab es NULL!");
+            if (prefabParada) fActual2 = CrearFlecha(bondi2, prefabParada, colorParada);
+            if (prefabDestino) fDestino2 = CrearFlecha(bondi2, prefabDestino, colorDestino);
         }
     }
 
-    GameObject CrearFlecha(Transform target)
+    GameObject CrearFlecha(Transform target, GameObject prefab, Color color)
     {
-        GameObject flecha = Instantiate(flechaPrefab, target.position, Quaternion.identity);
-        Renderer rend = flecha.GetComponent<Renderer>();
+        GameObject obj = Instantiate(prefab, target.position, Quaternion.identity);
+        Renderer rend = obj.GetComponentInChildren<Renderer>();
         if (rend != null)
         {
             Material mat = new Material(rend.material);
-            mat.SetFloat("_Mode", 3);
-            mat.SetColor("_Color", colorFlecha);
-            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetFloat("_ZWrite", 0);
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.EnableKeyword("_ALPHABLEND_ON");
-            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            mat.renderQueue = 3000;
+            mat.SetColor("_Color", color);
             rend.material = mat;
         }
-        return flecha;
+        return obj;
     }
 
     void LateUpdate()
     {
-        ParadaController paradaActiva = GetParadaActiva();
+        if (spawner == null) return;
 
-        if (paradaActiva != null)
+        // Buscamos las paradas en el spawner
+        ParadaController pActual = GetParadaPorTipo(false);
+        ParadaController pDestino = GetParadaPorTipo(true);
+
+        // --- LÓGICA DE VISIBILIDAD BASADA EN PASAJEROS (NUEVO) ---
+
+        // Para el J1: La flecha de destino solo aparece si tiene pasajeros > 0
+        bool mostrarDestinoJ1 = (pc1 != null && pc1.GetCurrentPassengers() > 0);
+
+        // Para el J2: Lo mismo
+        bool mostrarDestinoJ2 = (pc2 != null && pc2.GetCurrentPassengers() > 0);
+
+        // --- ACTUALIZACIÓN DE FLECHAS ---
+
+        // Flechas de paradas comunes (Siempre aparecen si hay parada)
+        ActualizarPosicion(fActual1, bondi1, pActual);
+        ActualizarPosicion(fActual2, bondi2, pActual);
+
+        // Flechas de destino (Solo aparecen si tienen pasajeros)
+        ActualizarPosicion(fDestino1, bondi1, mostrarDestinoJ1 ? pDestino : null);
+        ActualizarPosicion(fDestino2, bondi2, mostrarDestinoJ2 ? pDestino : null);
+    }
+
+    void ActualizarPosicion(GameObject flecha, Transform bondi, ParadaController parada)
+    {
+        if (flecha == null || bondi == null) return;
+
+        // Si mandamos 'null' como parada, la flecha se oculta
+        if (parada != null)
         {
-            if (flecha1 != null && bondi1 != null)
-                MostrarFlechaHacia(flecha1, bondi1, paradaActiva.transform.position);
-            if (flecha2 != null && bondi2 != null)
-                MostrarFlechaHacia(flecha2, bondi2, paradaActiva.transform.position);
+            Vector3 dir = (parada.transform.position - bondi.position);
+            Vector3 dirP = Vector3.ProjectOnPlane(dir, ejeRotacion).normalized;
+
+            Vector3 finalPos = bondi.position + (dirP * orbitRadius);
+            finalPos += ejeRotacion.normalized * alturaExtra;
+
+            flecha.transform.position = finalPos;
+            flecha.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-90f, 0f, 0f);
+
+            flecha.SetActive(true);
         }
         else
         {
-            if (flecha1 != null) flecha1.SetActive(false);
-            if (flecha2 != null) flecha2.SetActive(false);
+            flecha.SetActive(false);
         }
     }
 
-    void MostrarFlechaHacia(GameObject flecha, Transform bondi, Vector3 targetPos)
+    ParadaController GetParadaPorTipo(bool esDestino)
     {
-        Vector3 dir = targetPos - bondi.position;
-        dir.y = 0;
-        dir.Normalize();
-
-        Vector3 posBonda = bondi.position + bondi.forward * distanciaAdelante;
-        posBonda.y += alturaExtra;
-
-        flecha.transform.position = posBonda;
-        flecha.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-90f, 0f, 0f);
-        flecha.SetActive(true);
-    }
-
-    ParadaController GetParadaActiva()
-    {
-        foreach (var parada in spawner.ParadasActivas)
+        foreach (var p in spawner.ParadasActivas)
         {
-            if (parada != null && !parada.esDestino)
-                return parada;
+            if (p != null && p.esDestino == esDestino) return p;
         }
         return null;
     }
 
     void OnDestroy()
     {
-        if (flecha1 != null) Destroy(flecha1);
-        if (flecha2 != null) Destroy(flecha2);
+        if (fActual1) Destroy(fActual1);
+        if (fActual2) Destroy(fActual2);
+        if (fDestino1) Destroy(fDestino1);
+        if (fDestino2) Destroy(fDestino2);
     }
 }

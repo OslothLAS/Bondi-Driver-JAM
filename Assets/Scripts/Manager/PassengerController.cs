@@ -104,4 +104,13 @@ public class PassengerController : MonoBehaviour
 
     // Agreg� esto en PassengerController.cs para que el GameManager pueda leer los puntos
     public int GetScore() => currentScore;
+
+    // Agregá esto al final de PassengerController.cs
+    public void PerderTodosLosPasajeros()
+    {
+        confirmedPassengers = 0;
+        pendingPassengers = 0;
+        UpdateUI();
+        Debug.Log("<color=red>¡EXPLOSIÓN! El colectivo quedó vacío.</color>");
+    }
 }
