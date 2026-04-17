@@ -74,16 +74,15 @@ public class BondiController : MonoBehaviour
             Debug.Log($"[{gameObject.name}] No gamepad {gamepadIndex} found. Use keyboard.");
         }
 
-        moveAction = new InputAction("Move");
-        moveAction.AddCompositeBinding("2DVector")
-            .With("Up", upKey).With("Down", downKey)
-            .With("Left", leftKey).With("Right", rightKey);
-        moveAction.AddBinding($"<Gamepad>{{{gamepadIndex}}}/leftStick");
-        moveAction.Enable();
+        steerAction.AddBinding(leftKey);
+        accelerateAction.AddBinding(upKey);
+        brakeAction.AddBinding(downKey);
 
         hornAction.AddBinding(hornKey);
-        hornAction.AddBinding($"<Gamepad>{{{gamepadIndex}}}/buttonSouth");
         hornAction.Enable();
+        steerAction.Enable();
+        accelerateAction.Enable();
+        brakeAction.Enable();
 
         rb = GetComponent<Rigidbody>();
         rb.interpolation = RigidbodyInterpolation.Interpolate;
