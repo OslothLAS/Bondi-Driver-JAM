@@ -20,6 +20,8 @@ public class ParadaController : MonoBehaviour
     [Header("Referencia Spawner")]
     [HideInInspector] public ParadaSpawner spawner;
 
+    private bool sonidoReproducido = false;
+
     private MeshRenderer meshRenderer;
     private PassengerController busActual;
     private Coroutine boardingCoroutine;
@@ -57,6 +59,12 @@ public class ParadaController : MonoBehaviour
                 Debug.Log($"Entró el bondi permitido: {nombreBondi}");
                 busActual = pc;
                 CambiarMaterial(materialVerde);
+
+                if (!sonidoReproducido && AudioManager.instance != null)
+                {
+                    AudioManager.instance.PlaySuspensionSound();
+                    sonidoReproducido = true;
+                }
 
                 if (esDestino)
                 {
@@ -178,5 +186,6 @@ public class ParadaController : MonoBehaviour
     {
         spawnHizoEnSalida = false;
         pasajerosEnParada = UnityEngine.Random.Range(2, 9);
+        sonidoReproducido = false;
     }
 }
