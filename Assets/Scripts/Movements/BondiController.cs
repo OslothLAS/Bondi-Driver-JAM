@@ -53,14 +53,6 @@ public class BondiController : MonoBehaviour
 
     void Awake()
     {
-        // Detectamos si es J1 o J2 por el nombre del objeto
-        int playerIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
-
-        if (playerIndex == 0)
-        {
-            Debug.Log($"Gamepad found: {gamepad.displayName}");
-        }
-
         gamepadIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
 
         steerAction = new InputAction("Steer");
@@ -82,18 +74,15 @@ public class BondiController : MonoBehaviour
             Debug.Log($"[{gameObject.name}] No gamepad {gamepadIndex} found. Use keyboard.");
         }
 
-        // Configuración de Input Action Map
         moveAction = new InputAction("Move");
         moveAction.AddCompositeBinding("2DVector")
             .With("Up", upKey).With("Down", downKey)
             .With("Left", leftKey).With("Right", rightKey);
-
-        moveAction.AddBinding($"<Gamepad>{{{playerIndex}}}/leftStick");
+        moveAction.AddBinding($"<Gamepad>{{{gamepadIndex}}}/leftStick");
         moveAction.Enable();
 
-        hornAction = new InputAction("Horn");
         hornAction.AddBinding(hornKey);
-        hornAction.AddBinding($"<Gamepad>{{{playerIndex}}}/buttonSouth");
+        hornAction.AddBinding($"<Gamepad>{{{gamepadIndex}}}/buttonSouth");
         hornAction.Enable();
 
         rb = GetComponent<Rigidbody>();

@@ -25,7 +25,6 @@ public class ParadaController : MonoBehaviour
     private MeshRenderer meshRenderer;
     private PassengerController busActual;
     private Coroutine boardingCoroutine;
-    private bool spawnHizoEnSalida = false;
 
     void Awake()
     {
@@ -184,7 +183,6 @@ public class ParadaController : MonoBehaviour
 
     public void ResetParada()
     {
-        spawnHizoEnSalida = false;
         pasajerosEnParada = UnityEngine.Random.Range(2, 9);
         sonidoReproducido = false;
     }
