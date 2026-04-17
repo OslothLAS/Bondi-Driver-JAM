@@ -5,14 +5,15 @@ using UnityEngine.InputSystem;
 public class BondiController : MonoBehaviour
 {
     private Animator anim;
+
     [Header("Configuración del Chiflido (Logarítmico)")]
-    public float aumentoSemitonos = 2f; // Cuántos semitones sube por toque
-    public float semitonesMaximos = 12f; // Límite (una octava arriba)
+    public float aumentoSemitonos = 2f;
+    public float semitonesMaximos = 12f;
     public float ventanaTiempoToqueRapido = 0.5f;
-    public float velocidadResetPitch = 5.0f; // Qué tan rápido bajan los semitones
+    public float velocidadResetPitch = 5.0f;
 
     private float lastHornTime;
-    private float currentSemitones = 0f; // Ahora trackeamos semitones, no el pitch directo
+    private float currentSemitones = 0f;
 
     [Header("Configuración de Teclas")]
     public string upKey;
@@ -24,6 +25,7 @@ public class BondiController : MonoBehaviour
     [Header("Física")]
     public float acceleration = 50f;
     public float steering = 25f;
+    public float maxSpeed = 18f; // <--- Límite de velocidad máxima
     [Range(0, 1)] public float driftFactor = 0.95f;
 
     [Header("Audio")]
@@ -32,11 +34,11 @@ public class BondiController : MonoBehaviour
     public AudioSource driftSound;
     public float driftSpeedThreshold = 8f;
 
-    [Header("Audio Motor (NUEVO)")]
+    [Header("Audio Motor")]
     public AudioSource engineSound;
-    public float minPitch = 0.8f;      // Tono en ralentí (quieto)
-    public float maxPitch = 2.2f;      // Tono a máxima velocidad
-    public float maxSpeedForPitch = 20f; // Velocidad donde el tono deja de subir
+    public float minPitch = 0.8f;
+    public float maxPitch = 2.2f;
+    public float maxSpeedForPitch = 20f;
 
     private Rigidbody rb;
     private InputAction moveAction;
@@ -45,6 +47,7 @@ public class BondiController : MonoBehaviour
 
     void Awake()
     {
+        // Detectamos si es J1 o J2 por el nombre del objeto
         int playerIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
 
         if (playerIndex == 0)
@@ -60,6 +63,7 @@ public class BondiController : MonoBehaviour
             hornKey = "<Keyboard>/oem1";
         }
 
+        // Configuración de Input Action Map
         moveAction = new InputAction("Move");
         moveAction.AddCompositeBinding("2DVector")
             .With("Up", upKey).With("Down", downKey)
@@ -81,7 +85,6 @@ public class BondiController : MonoBehaviour
     {
         anim = GetComponentInChildren<Animator>();
 
-        // Configuración inicial del motor
         if (engineSound != null)
         {
             engineSound.loop = true;
@@ -91,62 +94,51 @@ public class BondiController : MonoBehaviour
 
     void Update()
     {
-
         currentInput = moveAction.ReadValue<Vector2>();
 
+        // LÓGICA DE BOCINA (Logarítmica)
         if (hornAction.WasPressedThisFrame() && hornSound != null)
         {
             float timeSinceLastPress = Time.time - lastHornTime;
 
             if (timeSinceLastPress < ventanaTiempoToqueRapido)
             {
-                // Sumamos semitones de forma lineal (que al oído es logarítmico)
                 currentSemitones += aumentoSemitonos;
             }
             else
             {
-                currentSemitones = 0f; // Primer toque = Tono original
+                currentSemitones = 0f;
             }
 
             currentSemitones = Mathf.Min(currentSemitones, semitonesMaximos);
 
-            // CONVERSIÓN DE SEMITONES A MULTIPLICADOR DE PITCH (Fórmula musical)
-            // 1 semitono arriba es aproximadamente 1.0594 (raíz 12 de 2)
+            // Fórmula musical: 1.05946 es la raíz 12 de 2
             hornSound.pitch = Mathf.Pow(1.05946f, currentSemitones);
-
             hornSound.PlayOneShot(hornSound.clip);
             lastHornTime = Time.time;
         }
 
-        // El reset también tiene que ser sobre los semitones
+        // Reset gradual de los semitones de la bocina
         if (currentSemitones > 0f)
         {
             currentSemitones -= Time.deltaTime * velocidadResetPitch;
             if (currentSemitones < 0f) currentSemitones = 0f;
         }
 
-        if (hornAction.WasPressedThisFrame() && hornSound != null)
-        {
-            hornSound.Play();
-        }
-
+        // Animación de dirección y velocidad
         if (anim != null)
         {
             anim.SetFloat("Velocidad", currentInput.y, 0.1f, Time.deltaTime);
             anim.SetFloat("Giro", currentInput.x, 0.1f, Time.deltaTime);
         }
 
-        // --- LÓGICA DE PITCH DEL MOTOR ---
+        // LÓGICA DE PITCH DEL MOTOR
         if (engineSound != null)
         {
             float speed = rb.linearVelocity.magnitude;
-            // Normalizamos la velocidad entre 0 y 1
             float speedRatio = Mathf.Clamp01(speed / maxSpeedForPitch);
 
-            // Cambiamos el tono según la velocidad
             engineSound.pitch = Mathf.Lerp(minPitch, maxPitch, speedRatio);
-
-            // Tip extra: subir un poco el volumen cuando acelera
             engineSound.volume = Mathf.Lerp(0.4f, 0.8f, speedRatio);
         }
     }
@@ -155,11 +147,28 @@ public class BondiController : MonoBehaviour
     {
         float currentSpeed = rb.linearVelocity.magnitude;
 
+        // 1. LIMITADOR DE FUERZA: Solo aceleramos si no pasamos la maxSpeed
         if (currentInput.y != 0)
         {
-            rb.AddForce(transform.forward * currentInput.y * acceleration, ForceMode.Acceleration);
+            // Si el input es hacia adelante y estamos bajo el límite, aceleramos.
+            // Si es hacia atrás (frenado), siempre permitimos la fuerza.
+            if (currentInput.y > 0 && currentSpeed < maxSpeed)
+            {
+                rb.AddForce(transform.forward * currentInput.y * acceleration, ForceMode.Acceleration);
+            }
+            else if (currentInput.y < 0)
+            {
+                rb.AddForce(transform.forward * currentInput.y * acceleration, ForceMode.Acceleration);
+            }
         }
 
+        // 2. CLAMP DE SEGURIDAD: Cortamos la velocidad si un choque o gravedad nos acelera de más
+        if (rb.linearVelocity.magnitude > maxSpeed)
+        {
+            rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
+        }
+
+        // Lógica de Giro
         if (currentSpeed > 0.1f)
         {
             float direction = Vector3.Dot(rb.linearVelocity, transform.forward) > 0 ? 1 : -1;
@@ -170,14 +179,16 @@ public class BondiController : MonoBehaviour
             rb.MoveRotation(rb.rotation * deltaRotation);
         }
 
+        // Simulación de fricción lateral (Drift)
         Vector3 lateralVel = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
         rb.AddForce(-lateralVel * (1f - driftFactor), ForceMode.VelocityChange);
 
-        // DRIFT SOUND
+        // Sonido de Derrape
         if (driftSound != null && driftSound.clip != null)
         {
             float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
             bool isDrifting = forwardSpeed > driftSpeedThreshold && Mathf.Abs(currentInput.x) > 0.1f;
+
             if (isDrifting && !driftSound.isPlaying)
             {
                 driftSound.loop = true;
@@ -192,6 +203,7 @@ public class BondiController : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        // No chocar contra las paradas
         if (collision.gameObject.GetComponent<ParadaController>() != null) return;
 
         if (collision.relativeVelocity.magnitude > 7f)
