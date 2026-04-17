@@ -34,12 +34,18 @@ public class DamageController : MonoBehaviour
         UpdateUI();
     }
 
+    // Dentro de DamageController.cs agregá esto:
+
+    private int totalCollisionsAcumuladas = 0; // El contador que nunca vuelve a cero
+
+    // Modificá el OnCollisionEnter
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Ground")) return;
         if (Time.time < nextCollisionTime) return;
 
         collisionCount++;
+        totalCollisionsAcumuladas++; // <-- Sumamos al total de la partida
         nextCollisionTime = Time.time + cooldownTime;
         UpdateUI();
 
@@ -48,6 +54,14 @@ public class DamageController : MonoBehaviour
             Respawn();
         }
     }
+
+    // Agregá esta función pública al final para que el GameManager la use
+    public int GetTotalChoques()
+    {
+        return totalCollisionsAcumuladas;
+    }
+
+
 
     private void Respawn()
     {
@@ -101,4 +115,7 @@ public class DamageController : MonoBehaviour
             collisionText.text = $"Choques: {collisionCount}/{maxCollisions}";
         }
     }
+
+
+
 }

@@ -5,6 +5,14 @@ using UnityEngine.InputSystem;
 public class BondiController : MonoBehaviour
 {
     private Animator anim;
+    [Header("Configuración del Chiflido (Logarítmico)")]
+    public float aumentoSemitonos = 2f; // Cuántos semitones sube por toque
+    public float semitonesMaximos = 12f; // Límite (una octava arriba)
+    public float ventanaTiempoToqueRapido = 0.5f;
+    public float velocidadResetPitch = 5.0f; // Qué tan rápido bajan los semitones
+
+    private float lastHornTime;
+    private float currentSemitones = 0f; // Ahora trackeamos semitones, no el pitch directo
 
     [Header("Configuración de Teclas")]
     public string upKey;
@@ -83,7 +91,39 @@ public class BondiController : MonoBehaviour
 
     void Update()
     {
+
         currentInput = moveAction.ReadValue<Vector2>();
+
+        if (hornAction.WasPressedThisFrame() && hornSound != null)
+        {
+            float timeSinceLastPress = Time.time - lastHornTime;
+
+            if (timeSinceLastPress < ventanaTiempoToqueRapido)
+            {
+                // Sumamos semitones de forma lineal (que al oído es logarítmico)
+                currentSemitones += aumentoSemitonos;
+            }
+            else
+            {
+                currentSemitones = 0f; // Primer toque = Tono original
+            }
+
+            currentSemitones = Mathf.Min(currentSemitones, semitonesMaximos);
+
+            // CONVERSIÓN DE SEMITONES A MULTIPLICADOR DE PITCH (Fórmula musical)
+            // 1 semitono arriba es aproximadamente 1.0594 (raíz 12 de 2)
+            hornSound.pitch = Mathf.Pow(1.05946f, currentSemitones);
+
+            hornSound.PlayOneShot(hornSound.clip);
+            lastHornTime = Time.time;
+        }
+
+        // El reset también tiene que ser sobre los semitones
+        if (currentSemitones > 0f)
+        {
+            currentSemitones -= Time.deltaTime * velocidadResetPitch;
+            if (currentSemitones < 0f) currentSemitones = 0f;
+        }
 
         if (hornAction.WasPressedThisFrame() && hornSound != null)
         {
