@@ -6,14 +6,14 @@ public class BondiController : MonoBehaviour
 {
     private Animator anim;
 
-    [Header("Configuraci�n de Teclas")]
+    [Header("Configuración de Teclas")]
     public string upKey;
     public string downKey;
     public string leftKey;
     public string rightKey;
     public string hornKey;
 
-    [Header("F�sica")]
+    [Header("Física")]
     public float acceleration = 50f;
     public float steering = 25f;
     [Range(0, 1)] public float driftFactor = 0.95f;
@@ -24,6 +24,12 @@ public class BondiController : MonoBehaviour
     public AudioSource driftSound;
     public float driftSpeedThreshold = 8f;
 
+    [Header("Audio Motor (NUEVO)")]
+    public AudioSource engineSound;
+    public float minPitch = 0.8f;      // Tono en ralentí (quieto)
+    public float maxPitch = 2.2f;      // Tono a máxima velocidad
+    public float maxSpeedForPitch = 20f; // Velocidad donde el tono deja de subir
+
     private Rigidbody rb;
     private InputAction moveAction;
     private InputAction hornAction;
@@ -31,45 +37,48 @@ public class BondiController : MonoBehaviour
 
     void Awake()
     {
-        // 1. Identificaci�n y asignaci�n de teclas (Tu l�gica hardcodeada)
-        if (gameObject.name == "Bondi_J1")
+        int playerIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
+
+        if (playerIndex == 0)
         {
             upKey = "<Keyboard>/w"; downKey = "<Keyboard>/s";
             leftKey = "<Keyboard>/a"; rightKey = "<Keyboard>/d";
             hornKey = "<Keyboard>/e";
         }
-        else if (gameObject.name == "Bondi_J2")
+        else
         {
             upKey = "<Keyboard>/upArrow"; downKey = "<Keyboard>/downArrow";
             leftKey = "<Keyboard>/leftArrow"; rightKey = "<Keyboard>/rightArrow";
             hornKey = "<Keyboard>/oem1";
         }
-        else if (gameObject.name == "Bondi_J3")
-        {
-            upKey = "<Keyboard>/i"; downKey = "<Keyboard>/j";
-            leftKey = "<Keyboard>/k"; rightKey = "<Keyboard>/l";
-            hornKey = "<Keyboard>/p";
-        }
 
-        rb = GetComponent<Rigidbody>();
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.linearDamping = 0.5f;
-        rb.angularDamping = 0.5f;
-
-        // 2. Configuraci�n del New Input System para este bondi espec�fico
-        moveAction = new InputAction("Move", binding: "");
+        moveAction = new InputAction("Move");
         moveAction.AddCompositeBinding("2DVector")
             .With("Up", upKey).With("Down", downKey)
             .With("Left", leftKey).With("Right", rightKey);
+
+        moveAction.AddBinding($"<Gamepad>{{{playerIndex}}}/leftStick");
         moveAction.Enable();
 
-        hornAction = new InputAction("Horn", binding: hornKey);
+        hornAction = new InputAction("Horn");
+        hornAction.AddBinding(hornKey);
+        hornAction.AddBinding($"<Gamepad>{{{playerIndex}}}/buttonSouth");
         hornAction.Enable();
+
+        rb = GetComponent<Rigidbody>();
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
     }
 
     void Start()
     {
         anim = GetComponentInChildren<Animator>();
+
+        // Configuración inicial del motor
+        if (engineSound != null)
+        {
+            engineSound.loop = true;
+            engineSound.Play();
+        }
     }
 
     void Update()
@@ -86,19 +95,31 @@ public class BondiController : MonoBehaviour
             anim.SetFloat("Velocidad", currentInput.y, 0.1f, Time.deltaTime);
             anim.SetFloat("Giro", currentInput.x, 0.1f, Time.deltaTime);
         }
+
+        // --- LÓGICA DE PITCH DEL MOTOR ---
+        if (engineSound != null)
+        {
+            float speed = rb.linearVelocity.magnitude;
+            // Normalizamos la velocidad entre 0 y 1
+            float speedRatio = Mathf.Clamp01(speed / maxSpeedForPitch);
+
+            // Cambiamos el tono según la velocidad
+            engineSound.pitch = Mathf.Lerp(minPitch, maxPitch, speedRatio);
+
+            // Tip extra: subir un poco el volumen cuando acelera
+            engineSound.volume = Mathf.Lerp(0.4f, 0.8f, speedRatio);
+        }
     }
 
     void FixedUpdate()
     {
         float currentSpeed = rb.linearVelocity.magnitude;
 
-        // 1. ACELERACI�N F�SICA
         if (currentInput.y != 0)
         {
             rb.AddForce(transform.forward * currentInput.y * acceleration, ForceMode.Acceleration);
         }
 
-        // 2. GIRO DIN�MICO
         if (currentSpeed > 0.1f)
         {
             float direction = Vector3.Dot(rb.linearVelocity, transform.forward) > 0 ? 1 : -1;
@@ -109,11 +130,10 @@ public class BondiController : MonoBehaviour
             rb.MoveRotation(rb.rotation * deltaRotation);
         }
 
-        // 3. DRIFT
         Vector3 lateralVel = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
         rb.AddForce(-lateralVel * (1f - driftFactor), ForceMode.VelocityChange);
 
-        // 4. DRIFT SOUND
+        // DRIFT SOUND
         if (driftSound != null && driftSound.clip != null)
         {
             float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
@@ -130,7 +150,7 @@ public class BondiController : MonoBehaviour
         }
     }
 
-private void OnCollisionEnter(Collision collision)
+    private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.GetComponent<ParadaController>() != null) return;
 

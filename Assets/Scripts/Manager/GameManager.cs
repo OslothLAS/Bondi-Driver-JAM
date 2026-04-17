@@ -4,7 +4,6 @@ using TMPro;
 public class GameManager : MonoBehaviour
 {
     [Header("Configuracion de Tiempo")]
-    [Range(1f, 2.5f)]
     public float tiempoDePartidaMinutos = 1.5f;
 
     [Header("Referencias de Jugadores")]
@@ -13,8 +12,11 @@ public class GameManager : MonoBehaviour
 
     [Header("UI de Partida")]
     public TMP_Text timerUI;
-    public TMP_Text winnerUI; // El nuevo texto para el ganador
-    public GameObject panelFinDePartida;
+
+    [Header("Carteles de Fin de Juego")]
+    public GameObject cartelGanadorJ1; // Arrastrá el panel/objeto del J1 aquí
+    public GameObject cartelGanadorJ2; // Arrastrá el panel/objeto del J2 aquí
+    public GameObject cartelEmpate;    // Arrastrá el panel de empate aquí
 
     private float tiempoRestante;
     private bool juegoActivo = true;
@@ -22,66 +24,63 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         tiempoRestante = tiempoDePartidaMinutos * 60f;
-        if (panelFinDePartida != null) panelFinDePartida.SetActive(false);
-        if (winnerUI != null) winnerUI.text = ""; // Empezamos sin ganador
+
+        // Aseguramos que todos los carteles empiecen apagados
+        if (cartelGanadorJ1) cartelGanadorJ1.SetActive(false);
+        if (cartelGanadorJ2) cartelGanadorJ2.SetActive(false);
+        if (cartelEmpate) cartelEmpate.SetActive(false);
+
         UpdateTimerUI();
     }
 
     void Update()
     {
-        if (juegoActivo)
+        if (!juegoActivo) return;
+
+        if (tiempoRestante > 0)
         {
-            if (tiempoRestante > 0)
-            {
-                tiempoRestante -= Time.deltaTime;
-                UpdateTimerUI();
-            }
-            else
-            {
-                tiempoRestante = 0;
-                FinalizarPartida();
-            }
+            tiempoRestante -= Time.deltaTime;
+            UpdateTimerUI();
+        }
+        else
+        {
+            FinalizarPartida();
         }
     }
 
     void FinalizarPartida()
     {
         juegoActivo = false;
+        tiempoRestante = 0;
+        UpdateTimerUI();
 
-        // --- LÓGICA DEL GANADOR ---
-        if (winnerUI != null && jugador1 != null && jugador2 != null)
+        // Calculamos los puntajes
+        int puntosJ1 = (jugador1 != null) ? jugador1.GetScore() : 0;
+        int puntosJ2 = (jugador2 != null) ? jugador2.GetScore() : 0;
+
+        // Activamos ÚNICAMENTE el cartel que corresponde
+        if (puntosJ1 > puntosJ2)
         {
-            int puntosJ1 = jugador1.GetScore();
-            int puntosJ2 = jugador2.GetScore();
-
-            if (puntosJ1 > puntosJ2)
-            {
-                winnerUI.text = "GANADOR: JUGADOR 1";
-                winnerUI.color = Color.cyan; // Color del Bondi_J1
-            }
-            else if (puntosJ2 > puntosJ1)
-            {
-                winnerUI.text = "GANADOR: JUGADOR 2";
-                winnerUI.color = Color.green; // Color del Bondi_J2
-            }
-            else
-            {
-                winnerUI.text = "¡EMPATE TÉCNICO!";
-                winnerUI.color = Color.white;
-            }
+            if (cartelGanadorJ1) cartelGanadorJ1.SetActive(true);
+        }
+        else if (puntosJ2 > puntosJ1)
+        {
+            if (cartelGanadorJ2) cartelGanadorJ2.SetActive(true);
+        }
+        else
+        {
+            if (cartelEmpate) cartelEmpate.SetActive(true);
         }
 
-        if (panelFinDePartida != null) panelFinDePartida.SetActive(true);
+        // Pausamos el tiempo de juego
         Time.timeScale = 0f;
     }
 
     void UpdateTimerUI()
     {
-        if (timerUI != null)
-        {
-            int minutos = Mathf.FloorToInt(tiempoRestante / 60);
-            int segundos = Mathf.FloorToInt(tiempoRestante % 60);
-            timerUI.text = string.Format("{0:00}:{1:00}", minutos, segundos);
-        }
+        if (timerUI == null) return;
+        int minutos = Mathf.FloorToInt(tiempoRestante / 60);
+        int segundos = Mathf.FloorToInt(tiempoRestante % 60);
+        timerUI.text = string.Format("{0:00}:{1:00}", minutos, segundos);
     }
 }
