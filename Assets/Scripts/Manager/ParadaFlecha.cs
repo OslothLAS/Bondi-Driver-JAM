@@ -83,7 +83,7 @@ public class ParadaFlecha : MonoBehaviour
         posBonda.y += 3f;
 
         flechaActual.transform.position = posBonda;
-        flechaActual.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-90f, 0f, 0f);
+        flechaActual.transform.rotation = Quaternion.LookRotation(dir);
         flechaActual.SetActive(true);
         flechaActiva = true;
     }
