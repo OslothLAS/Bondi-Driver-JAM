@@ -3,32 +3,30 @@ using UnityEngine;
 public class ParadaFlecha : MonoBehaviour
 {
     public GameObject flechaPrefab;
-    public Transform bondi;
+    public Transform bondi1;
+    public Transform bondi2;
     public ParadaSpawner spawner;
 
-    private GameObject flechaActual;
-    private bool flechaActiva = false;
+    private GameObject flecha1;
+    private GameObject flecha2;
 
     void Start()
     {
-
-        if (bondi == null)
+        if (bondi1 == null)
         {
-            GameObject bondiObj = GameObject.FindGameObjectWithTag("Player");
-            if (bondiObj != null)
-            {
-                bondi = bondiObj.transform;
-            }
-            else
-            {
-                Debug.LogError("NO se encontro Bondi con tag Player!");
-            }
+            GameObject b1 = GameObject.Find("Bondi_J1");
+            if (b1 != null) bondi1 = b1.transform;
+        }
+        if (bondi2 == null)
+        {
+            GameObject b2 = GameObject.Find("Bondi_J2");
+            if (b2 != null) bondi2 = b2.transform;
         }
 
         if (flechaPrefab != null)
         {
-            flechaActual = Instantiate(flechaPrefab, bondi.position, Quaternion.identity);
-            AplicarMaterialHolografico();
+            if (bondi1 != null) flecha1 = CrearFlecha(bondi1);
+            if (bondi2 != null) flecha2 = CrearFlecha(bondi2);
         }
         else
         {
@@ -36,9 +34,10 @@ public class ParadaFlecha : MonoBehaviour
         }
     }
 
-    void AplicarMaterialHolografico()
+    GameObject CrearFlecha(Transform target)
     {
-        Renderer rend = flechaActual.GetComponent<Renderer>();
+        GameObject flecha = Instantiate(flechaPrefab, target.position, Quaternion.identity);
+        Renderer rend = flecha.GetComponent<Renderer>();
         if (rend != null)
         {
             Material mat = new Material(rend.material);
@@ -53,27 +52,28 @@ public class ParadaFlecha : MonoBehaviour
             mat.renderQueue = 3000;
             rend.material = mat;
         }
+        return flecha;
     }
 
     void LateUpdate()
     {
-        if (flechaActual == null || bondi == null || spawner == null)
-            return;
-
         ParadaController paradaActiva = GetParadaActiva();
 
         if (paradaActiva != null)
         {
-            float dist = Vector3.Distance(bondi.position, paradaActiva.transform.position);
-            MostrarFlechaHacia(paradaActiva.transform.position);
+            if (flecha1 != null && bondi1 != null)
+                MostrarFlechaHacia(flecha1, bondi1, paradaActiva.transform.position);
+            if (flecha2 != null && bondi2 != null)
+                MostrarFlechaHacia(flecha2, bondi2, paradaActiva.transform.position);
         }
         else
         {
-            OcultarFlecha();
+            if (flecha1 != null) flecha1.SetActive(false);
+            if (flecha2 != null) flecha2.SetActive(false);
         }
     }
 
-    void MostrarFlechaHacia(Vector3 targetPos)
+    void MostrarFlechaHacia(GameObject flecha, Transform bondi, Vector3 targetPos)
     {
         Vector3 dir = targetPos - bondi.position;
         dir.y = 0;
@@ -82,17 +82,9 @@ public class ParadaFlecha : MonoBehaviour
         Vector3 posBonda = bondi.position + bondi.forward * 48f;
         posBonda.y += 3f;
 
-        flechaActual.transform.position = posBonda;
-        flechaActual.transform.rotation = Quaternion.LookRotation(dir);
-        flechaActual.SetActive(true);
-        flechaActiva = true;
-    }
-
-    void OcultarFlecha()
-    {
-        if (flechaActual != null)
-            flechaActual.SetActive(false);
-        flechaActiva = false;
+        flecha.transform.position = posBonda;
+        flecha.transform.rotation = Quaternion.LookRotation(dir);
+        flecha.SetActive(true);
     }
 
     ParadaController GetParadaActiva()
@@ -107,7 +99,7 @@ public class ParadaFlecha : MonoBehaviour
 
     void OnDestroy()
     {
-        if (flechaActual != null)
-            Destroy(flechaActual);
+        if (flecha1 != null) Destroy(flecha1);
+        if (flecha2 != null) Destroy(flecha2);
     }
 }
