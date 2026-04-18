@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -24,6 +25,9 @@ public class GameManager : MonoBehaviour
     public GameObject cartelGanadorJ2;
     public GameObject cartelEmpate;
 
+    [Header("Boton Reiniciar")]
+    public GameObject botonReiniciar;
+
     private float tiempoRestante;
     private bool juegoActivo = true;
 
@@ -38,6 +42,7 @@ public class GameManager : MonoBehaviour
 
         if (puntosFinalesJ1 != null) puntosFinalesJ1.gameObject.SetActive(false);
         if (puntosFinalesJ2 != null) puntosFinalesJ2.gameObject.SetActive(false);
+        if (botonReiniciar != null) botonReiniciar.SetActive(false);
 
         UpdateTimerUI();
     }
@@ -81,7 +86,9 @@ public class GameManager : MonoBehaviour
             puntosFinalesJ2.text = $"Puntos: {puntosJ2}\nChoques: {choquesJ2}";
         }
 
-        // --- LÓGICA DE GANADOR CON DESEMPATE ---
+        if (botonReiniciar != null) botonReiniciar.SetActive(true);
+
+        // --- Lï¿½GICA DE GANADOR CON DESEMPATE ---
         if (puntosJ1 > puntosJ2)
         {
             cartelGanadorJ1.SetActive(true);
@@ -118,5 +125,11 @@ public class GameManager : MonoBehaviour
         int minutos = Mathf.FloorToInt(tiempoRestante / 60);
         int segundos = Mathf.FloorToInt(tiempoRestante % 60);
         timerUI.text = string.Format("{0:00}:{1:00}", minutos, segundos);
+    }
+
+    public void ReiniciarJuego()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }

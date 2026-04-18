@@ -8,8 +8,17 @@ public class ToggleObjeto : MonoBehaviour
     {
         if (objetoATogglear != null)
         {
-            // La magia: ponemos el objeto en el estado OPUESTO al actual (!)
-            objetoATogglear.SetActive(!objetoATogglear.activeSelf);
+            bool nuevoEstado = !objetoATogglear.activeSelf;
+            objetoATogglear.SetActive(nuevoEstado);
+
+            if (nuevoEstado)
+            {
+                AudioSource audio = objetoATogglear.GetComponent<AudioSource>();
+                if (audio != null)
+                {
+                    audio.Play();
+                }
+            }
         }
     }
 }
