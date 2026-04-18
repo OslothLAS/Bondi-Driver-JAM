@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,6 +52,9 @@ public class GameManager : MonoBehaviour
     [Header("Otros")]
     public GameObject cartelEmpate;
 
+    [Header("Boton Reiniciar")]
+    public GameObject botonReiniciar;
+
     private float tiempoRestante;
     private bool juegoActivo = true;
 
@@ -71,7 +75,18 @@ public class GameManager : MonoBehaviour
         tiempoRestante = tiempoDePartidaMinutos * 60f;
         Time.timeScale = 1f;
 
+<<<<<<< HEAD
         DesactivarTodoAlInicio();
+=======
+        if (cartelGanadorJ1) cartelGanadorJ1.SetActive(false);
+        if (cartelGanadorJ2) cartelGanadorJ2.SetActive(false);
+        if (cartelEmpate) cartelEmpate.SetActive(false);
+
+        if (puntosFinalesJ1 != null) puntosFinalesJ1.gameObject.SetActive(false);
+        if (puntosFinalesJ2 != null) puntosFinalesJ2.gameObject.SetActive(false);
+        if (botonReiniciar != null) botonReiniciar.SetActive(false);
+
+>>>>>>> 7370fea70bdd984824c6676af3337010aa8e01b1
         UpdateTimerUI();
     }
     void Update()
@@ -114,6 +129,7 @@ public class GameManager : MonoBehaviour
 
         if (resultados.Count == 0) return;
 
+<<<<<<< HEAD
         // Ranking con triple criterio: Puntos -> Choques -> Pasajeros a bordo
         var ranking = resultados.OrderByDescending(r => r.puntos)
                                 .ThenBy(r => r.choques)
@@ -126,6 +142,12 @@ public class GameManager : MonoBehaviour
                              ranking[0].pasajerosActuales == ranking[1].pasajerosActuales;
 
         if (empateAbsoluto)
+=======
+        if (botonReiniciar != null) botonReiniciar.SetActive(true);
+
+        // --- L�GICA DE GANADOR CON DESEMPATE ---
+        if (puntosJ1 > puntosJ2)
+>>>>>>> 7370fea70bdd984824c6676af3337010aa8e01b1
         {
             if (cartelEmpate) cartelEmpate.SetActive(true);
         }
@@ -204,5 +226,11 @@ public class GameManager : MonoBehaviour
         public int puntos;
         public int choques;
         public int pasajerosActuales;
+    }
+
+    public void ReiniciarJuego()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
