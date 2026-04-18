@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class PlayerSetup : MonoBehaviour
 {
-    public enum PlayerID { Player1, Player2 }
+    public enum PlayerID { Player1, Player2, Player3, Player4 }
     public PlayerID playerID;
 
     private void Awake()
@@ -10,27 +10,56 @@ public class PlayerSetup : MonoBehaviour
         BondiController controller = GetComponent<BondiController>();
         Camera cam = GetComponentInChildren<Camera>();
 
-        if (playerID == PlayerID.Player1)
+        // CONFIGURACIÓN DE TECLAS Y CÁMARA SEGÚN ID
+        switch (playerID)
         {
-            // Configura teclas para J1
-            controller.upKey = "<Keyboard>/w";
-            controller.downKey = "<Keyboard>/s";
-            controller.leftKey = "<Keyboard>/a";
-            controller.rightKey = "<Keyboard>/d";
+            case PlayerID.Player1:
+                // J1: WASD + E
+                controller.upKey = "<Keyboard>/w";
+                controller.downKey = "<Keyboard>/s";
+                controller.leftKey = "<Keyboard>/a";
+                controller.rightKey = "<Keyboard>/d";
+                controller.hornKey = "<Keyboard>/e";
 
-            // Pantalla arriba
-            if (cam != null) cam.rect = new Rect(0, 0.5f, 1, 0.5f);
-        }
-        else
-        {
-            // Configura teclas para J2
-            controller.upKey = "<Keyboard>/upArrow";
-            controller.downKey = "<Keyboard>/downArrow";
-            controller.leftKey = "<Keyboard>/leftArrow";
-            controller.rightKey = "<Keyboard>/rightArrow";
+                // Cámara: Arriba-Izquierda
+                if (cam != null) cam.rect = new Rect(0, 0.5f, 0.5f, 0.5f);
+                break;
 
-            // Pantalla abajo
-            if (cam != null) cam.rect = new Rect(0, 0, 1, 0.5f);
+            case PlayerID.Player2:
+                // J2: IJKL + O
+                controller.upKey = "<Keyboard>/i";
+                controller.downKey = "<Keyboard>/k";
+                controller.leftKey = "<Keyboard>/j";
+                controller.rightKey = "<Keyboard>/l";
+                controller.hornKey = "<Keyboard>/o";
+
+                // Cámara: Arriba-Derecha
+                if (cam != null) cam.rect = new Rect(0.5f, 0.5f, 0.5f, 0.5f);
+                break;
+
+            case PlayerID.Player3:
+                // J3: Flechas + Ctrl Derecho
+                controller.upKey = "<Keyboard>/upArrow";
+                controller.downKey = "<Keyboard>/downArrow";
+                controller.leftKey = "<Keyboard>/leftArrow";
+                controller.rightKey = "<Keyboard>/rightArrow";
+                controller.hornKey = "<Keyboard>/rightCtrl";
+
+                // Cámara: Abajo-Izquierda
+                if (cam != null) cam.rect = new Rect(0, 0, 0.5f, 0.5f);
+                break;
+
+            case PlayerID.Player4:
+                // J4: Numpad 8462 + *
+                controller.upKey = "<Keyboard>/numpad8";
+                controller.downKey = "<Keyboard>/numpad2";
+                controller.leftKey = "<Keyboard>/numpad4";
+                controller.rightKey = "<Keyboard>/numpad6";
+                controller.hornKey = "<Keyboard>/numpadMultiply";
+
+                // Cámara: Abajo-Derecha
+                if (cam != null) cam.rect = new Rect(0.5f, 0, 0.5f, 0.5f);
+                break;
         }
     }
 }

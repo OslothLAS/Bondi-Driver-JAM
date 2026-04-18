@@ -4,12 +4,12 @@ using System.Collections.Generic;
 public class ParadaSpawner : MonoBehaviour
 {
     [Header("Configuracion de Distancia")]
-    [Tooltip("Distancia minima desde el punto medio de los bondis (en metros)")]
-    public float distanciaMinima = 600f;
+    [Tooltip("Distancia minima desde el baricentro de los 4 bondis")]
+    public float distanciaMinima = 400f; // Ajustá según el tamaño de tu mapa
 
     [Header("Referencias de Bondis")]
-    public Transform bondi1;
-    public Transform bondi2;
+    // Usamos un array para manejar a los 4 jugadores de forma limpia
+    public Transform[] bondis = new Transform[4];
 
     [Header("Base de Datos de Paradas")]
     [SerializeField] private List<ParadaController> todasLasParadas = new List<ParadaController>();
@@ -19,60 +19,63 @@ public class ParadaSpawner : MonoBehaviour
 
     void Start()
     {
-        // 1. BUSQUEDA AUTOMATICA DE BONDIS (Hardcoded por nombre como pediste)
-        if (bondi1 == null)
+        // 1. BUSQUEDA AUTOMATICA DE LOS 4 BONDIS
+        for (int i = 0; i < 4; i++)
         {
-            GameObject b1 = GameObject.Find("Bondi_J1");
-            if (b1 != null) bondi1 = b1.transform;
-        }
-        if (bondi2 == null)
-        {
-            GameObject b2 = GameObject.Find("Bondi_J2");
-            if (b2 != null) bondi2 = b2.transform;
+            if (bondis[i] == null)
+            {
+                GameObject b = GameObject.Find("Bondi_J" + (i + 1));
+                if (b != null) bondis[i] = b.transform;
+            }
         }
 
-        // 2. BUSQUEDA AUTOMATICA DE PARADAS POR TAG
+        // 2. BUSQUEDA DE PARADAS Y DESTINOS
         todasLasParadas.Clear();
+        // Buscamos todo lo que tenga el tag Parada
         GameObject[] paradasEncontradas = GameObject.FindGameObjectsWithTag("Parada");
-
         foreach (GameObject obj in paradasEncontradas)
         {
             ParadaController controller = obj.GetComponent<ParadaController>();
             if (controller != null)
             {
                 todasLasParadas.Add(controller);
-                controller.spawner = this; // Vinculamos el spawner a la parada
+                controller.spawner = this;
             }
         }
 
-        Debug.Log($"[Spawner] Inicializado. Bondis: {(bondi1 ? 1 : 0) + (bondi2 ? 1 : 0)} | Paradas: {todasLasParadas.Count}");
+        Debug.Log($"[Spawner] Sistemas listos. Bondis detectados: {GetCantidadBondisActivos()} | Paradas totales: {todasLasParadas.Count}");
 
-        // 3. LOGICA INICIAL
+        // 3. INICIO DE PARTIDA
         OcultarTodasLasParadas(true);
 
-        // Activamos el destino si existe
+        // Activamos el destino (Obelisco)
         ParadaController destino = ObtenerParadaDestino();
         if (destino != null) ActivarParada(destino);
 
-        // Si no hay paradas activas, spawneamos la primera de pasajeros
-        if (paradasActivas.Count == 0 || (paradasActivas.Count == 1 && destino != null))
-        {
-            ParadaController primera = ObtenerNuevaParada();
-            if (primera != null) ActivarParada(primera);
-        }
+        // Spawneamos la primera parada de pasajeros
+        ParadaController primera = ObtenerNuevaParada();
+        if (primera != null) ActivarParada(primera);
     }
 
-    // --- CALCULO DEL PUNTO MEDIO ---
+    // --- CÁLCULO DEL BARICENTRO (Punto medio de todos) ---
     public Vector3 GetBondisMidpoint()
     {
-        if (bondi1 != null && bondi2 != null)
-            return (bondi1.position + bondi2.position) / 2f;
+        Vector3 sumaPosiciones = Vector3.zero;
+        int contador = 0;
 
-        if (bondi1 != null) return bondi1.position;
-        if (bondi2 != null) return bondi2.position;
+        foreach (Transform t in bondis)
+        {
+            if (t != null)
+            {
+                sumaPosiciones += t.position;
+                contador++;
+            }
+        }
 
-        return Vector3.zero; // Fallback si no hay ningun bondi
+        return contador > 0 ? sumaPosiciones / contador : Vector3.zero;
     }
+
+    // Modificá este método dentro de tu ParadaSpawner.cs
 
     public void OnParadaDesocupada(ParadaController parada, int capacidadRestante, bool fueCompletada)
     {
@@ -80,25 +83,37 @@ public class ParadaSpawner : MonoBehaviour
 
         bool eraDestino = parada.esDestino;
 
+        // --- CAMBIO CLAVE: EL DESTINO NO SE DESACTIVA ---
         if (paradasActivas.Contains(parada))
         {
-            parada.gameObject.SetActive(false);
-            paradasActivas.Remove(parada);
+            // Solo desactivamos y removemos si ES una parada común
+            if (!eraDestino)
+            {
+                parada.gameObject.SetActive(false);
+                paradasActivas.Remove(parada);
+
+                // Si el bondi todavía tiene lugar, spawneamos otra parada común
+                if (capacidadRestante > 0)
+                {
+                    ParadaController nueva = ObtenerNuevaParada();
+                    if (nueva != null) ActivarParada(nueva);
+                }
+            }
+            else
+            {
+                // Si es destino, NO hacemos nada. Se queda ahí para el próximo bondi.
+                Debug.Log("[Sistemas] Destino completado por un jugador, permanece activo para los demás.");
+            }
         }
 
-        // Si el bondi está lleno, priorizar destino (o mantenerlo activo)
+        // Si el bondi se llenó y por alguna razón el destino estaba apagado, lo prendemos
         if (capacidadRestante <= 0)
         {
             ParadaController destino = ObtenerParadaDestino();
-            if (destino != null) destino.gameObject.SetActive(true);
-            return;
-        }
-
-        // Si terminó la parada y no era destino, buscamos la siguiente
-        if (!eraDestino)
-        {
-            ParadaController nuevaParada = ObtenerNuevaParada();
-            if (nuevaParada != null) ActivarParada(nuevaParada);
+            if (destino != null && !destino.gameObject.activeSelf)
+            {
+                ActivarParada(destino);
+            }
         }
     }
 
@@ -106,7 +121,7 @@ public class ParadaSpawner : MonoBehaviour
     {
         if (todasLasParadas.Count == 0) return null;
 
-        Vector3 puntoReferencia = GetBondisMidpoint();
+        Vector3 baricentro = GetBondisMidpoint();
         List<ParadaController> disponibles = new List<ParadaController>();
 
         foreach (var parada in todasLasParadas)
@@ -114,28 +129,28 @@ public class ParadaSpawner : MonoBehaviour
             if (parada == null || paradasActivas.Contains(parada) || parada.esDestino)
                 continue;
 
-            float distancia = Vector3.Distance(puntoReferencia, parada.transform.position);
+            float distancia = Vector3.Distance(baricentro, parada.transform.position);
 
             if (distancia >= distanciaMinima)
                 disponibles.Add(parada);
         }
 
+        // Fallback: si ninguna está lejos, agarramos una al azar para no romper el loop
         if (disponibles.Count == 0)
         {
-            Debug.LogWarning("[Spawner] Ninguna parada a mas de " + distanciaMinima + "m del punto medio.");
-            return null;
+            return todasLasParadas.Find(p => !p.esDestino && !paradasActivas.Contains(p));
         }
 
         return disponibles[Random.Range(0, disponibles.Count)];
     }
 
+    // --- MÉTODOS DE CONTROL ---
+
     void ActivarParada(ParadaController parada)
     {
-        if (paradasActivas.Contains(parada)) return;
-
+        if (parada == null || paradasActivas.Contains(parada)) return;
         parada.gameObject.SetActive(true);
         paradasActivas.Add(parada);
-        Debug.Log($"[Spawner] Activada: {parada.name}");
     }
 
     void OcultarTodasLasParadas(bool incluirDestino = true)
@@ -151,10 +166,20 @@ public class ParadaSpawner : MonoBehaviour
 
     public ParadaController ObtenerParadaDestino()
     {
-        foreach (var parada in todasLasParadas)
-        {
-            if (parada != null && parada.esDestino) return parada;
-        }
-        return null;
+        return todasLasParadas.Find(p => p != null && p.esDestino);
+    }
+
+    private int GetCantidadBondisActivos()
+    {
+        int count = 0;
+        foreach (var b in bondis) if (b != null) count++;
+        return count;
+    }
+
+    private int GetCantidadParadasCargaActivas()
+    {
+        int count = 0;
+        foreach (var p in paradasActivas) if (!p.esDestino) count++;
+        return count;
     }
 }

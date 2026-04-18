@@ -6,6 +6,13 @@ public class BondiController : MonoBehaviour
 {
     private Animator anim;
 
+    [Header("Configuración de Teclas (Manual)")]
+    public string upKey;
+    public string downKey;
+    public string leftKey;
+    public string rightKey;
+    public string hornKey;
+
     [Header("Configuración del Chiflido")]
     public float aumentoSemitonos = 2f;
     public float semitonesMaximos = 12f;
@@ -14,13 +21,6 @@ public class BondiController : MonoBehaviour
 
     private float lastHornTime;
     private float currentSemitones = 0f;
-
-    [Header("Configuración de Teclas")]
-    public string upKey;
-    public string downKey;
-    public string leftKey;
-    public string rightKey;
-    public string hornKey;
 
     [Header("Física")]
     public float acceleration = 50f;
@@ -47,58 +47,66 @@ public class BondiController : MonoBehaviour
     private InputAction steerAction;
 
     private Vector2 currentInput;
-    private int gamepadIndex;
+    private int playerIndex; // 0 a 3
 
     void Awake()
     {
-        gamepadIndex = (gameObject.name == "Bondi_J1") ? 0 : 1;
+        // Determinamos el índice por el nombre del objeto
+        if (gameObject.name.Contains("J1")) playerIndex = 0;
+        else if (gameObject.name.Contains("J2")) playerIndex = 1;
+        else if (gameObject.name.Contains("J3")) playerIndex = 2;
+        else if (gameObject.name.Contains("J4")) playerIndex = 3;
 
-        // Definimos las teclas según el jugador
-        if (gamepadIndex == 0)
-        {
-            upKey = "<Keyboard>/w"; downKey = "<Keyboard>/s";
-            leftKey = "<Keyboard>/a"; rightKey = "<Keyboard>/d";
-            hornKey = "<Keyboard>/e";
-        }
-        else
-        {
-            upKey = "<Keyboard>/upArrow"; downKey = "<Keyboard>/downArrow";
-            leftKey = "<Keyboard>/leftArrow"; rightKey = "<Keyboard>/rightArrow";
-            hornKey = "<Keyboard>/oem1";
-        }
+        ConfigurarInputs();
 
-        // --- CONFIGURACIÓN DE ACCIONES ---
+        rb = GetComponent<Rigidbody>();
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+    }
+
+    void ConfigurarInputs()
+    {
         steerAction = new InputAction("Steer");
         accelerateAction = new InputAction("Accelerate");
         brakeAction = new InputAction("Brake");
         hornAction = new InputAction("Horn");
 
-        // 1. Vinculamos Teclado (WASD / Flechas)
-        steerAction.AddCompositeBinding("Axis")
-            .With("Negative", leftKey)
-            .With("Positive", rightKey);
-        accelerateAction.AddBinding(upKey);
-        brakeAction.AddBinding(downKey);
-        hornAction.AddBinding(hornKey);
+        string up = "", down = "", left = "", right = "", horn = "";
 
-        // 2. Vinculamos Gamepad (si existe)
-        if (Gamepad.all.Count > gamepadIndex)
+        // --- MAPEO DE TECLADO ---
+        switch (playerIndex)
         {
-            Gamepad gamepad = Gamepad.all[gamepadIndex];
+            case 0: // J1: WASD + E
+                up = "<Keyboard>/w"; down = "<Keyboard>/s"; left = "<Keyboard>/a"; right = "<Keyboard>/d"; horn = "<Keyboard>/e";
+                break;
+            case 1: // J2: IJKL + O
+                up = "<Keyboard>/i"; down = "<Keyboard>/k"; left = "<Keyboard>/j"; right = "<Keyboard>/l"; horn = "<Keyboard>/o";
+                break;
+            case 2: // J3: FLECHAS + CTRL
+                up = "<Keyboard>/upArrow"; down = "<Keyboard>/downArrow"; left = "<Keyboard>/leftArrow"; right = "<Keyboard>/rightArrow"; horn = "<Keyboard>/rightCtrl";
+                break;
+            case 3: // J4: NUMPAD 8462 + *
+                up = "<Keyboard>/numpad8"; down = "<Keyboard>/numpad2"; left = "<Keyboard>/numpad4"; right = "<Keyboard>/numpad6"; horn = "<Keyboard>/numpadMultiply";
+                break;
+        }
+
+        // Bindings de Teclado
+        steerAction.AddCompositeBinding("Axis").With("Negative", left).With("Positive", right);
+        accelerateAction.AddBinding(up);
+        brakeAction.AddBinding(down);
+        hornAction.AddBinding(horn);
+
+        // --- BINDINGS DE GAMEPAD (Automático por índice) ---
+        if (Gamepad.all.Count > playerIndex)
+        {
+            Gamepad gamepad = Gamepad.all[playerIndex];
             steerAction.AddBinding(gamepad.leftStick.x);
             accelerateAction.AddBinding(gamepad.rightTrigger);
             brakeAction.AddBinding(gamepad.leftTrigger);
-            hornAction.AddBinding(gamepad.buttonSouth);
+            hornAction.AddBinding(gamepad.buttonSouth); // Botón A / X
         }
 
-        // --- IMPORTANTE: Habilitar todas las acciones ---
-        steerAction.Enable();
-        accelerateAction.Enable();
-        brakeAction.Enable();
-        hornAction.Enable();
-
-        rb = GetComponent<Rigidbody>();
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        // Habilitar todo
+        steerAction.Enable(); accelerateAction.Enable(); brakeAction.Enable(); hornAction.Enable();
     }
 
     void Start()
@@ -113,22 +121,18 @@ public class BondiController : MonoBehaviour
 
     void Update()
     {
-        // Leemos los valores (ahora combinan teclado y gamepad)
         float steer = steerAction.ReadValue<float>();
         float accel = accelerateAction.ReadValue<float>();
         float brake = brakeAction.ReadValue<float>();
 
-        // Consolidamos el input
         currentInput = new Vector2(steer, accel - brake);
 
-        // LÓGICA DE BOCINA
+        // BOCINA
         if (hornAction.WasPressedThisFrame() && hornSound != null)
         {
             float timeSinceLastPress = Time.time - lastHornTime;
-            if (timeSinceLastPress < ventanaTiempoToqueRapido)
-                currentSemitones += aumentoSemitonos;
-            else
-                currentSemitones = 0f;
+            if (timeSinceLastPress < ventanaTiempoToqueRapido) currentSemitones += aumentoSemitonos;
+            else currentSemitones = 0f;
 
             currentSemitones = Mathf.Min(currentSemitones, semitonesMaximos);
             hornSound.pitch = Mathf.Pow(1.05946f, currentSemitones);
@@ -142,18 +146,16 @@ public class BondiController : MonoBehaviour
             if (currentSemitones < 0f) currentSemitones = 0f;
         }
 
-        // Animaciones
+        // Animaciones y Audio Motor
         if (anim != null)
         {
             anim.SetFloat("Velocidad", currentInput.y, 0.1f, Time.deltaTime);
             anim.SetFloat("Giro", currentInput.x, 0.1f, Time.deltaTime);
         }
 
-        // Audio Motor
         if (engineSound != null)
         {
-            float speed = rb.linearVelocity.magnitude;
-            float speedRatio = Mathf.Clamp01(speed / maxSpeedForPitch);
+            float speedRatio = Mathf.Clamp01(rb.linearVelocity.magnitude / maxSpeedForPitch);
             engineSound.pitch = Mathf.Lerp(minPitch, maxPitch, speedRatio);
             engineSound.volume = Mathf.Lerp(0.4f, 0.8f, speedRatio);
         }
@@ -163,7 +165,6 @@ public class BondiController : MonoBehaviour
     {
         float currentSpeed = rb.linearVelocity.magnitude;
 
-        // Aplicamos fuerza con el limitador de velocidad
         if (currentInput.y != 0)
         {
             if (currentInput.y > 0 && currentSpeed < maxSpeed)
@@ -172,11 +173,8 @@ public class BondiController : MonoBehaviour
                 rb.AddForce(transform.forward * currentInput.y * acceleration, ForceMode.Acceleration);
         }
 
-        // Clamp de seguridad
-        if (rb.linearVelocity.magnitude > maxSpeed)
-            rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
+        if (currentSpeed > maxSpeed) rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
 
-        // Giro
         if (currentSpeed > 0.1f)
         {
             float direction = Vector3.Dot(rb.linearVelocity, transform.forward) > 0 ? 1 : -1;
@@ -185,11 +183,9 @@ public class BondiController : MonoBehaviour
             rb.MoveRotation(rb.rotation * Quaternion.Euler(0, rotation, 0));
         }
 
-        // Drift / Fricción lateral
         Vector3 lateralVel = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
         rb.AddForce(-lateralVel * (1f - driftFactor), ForceMode.VelocityChange);
 
-        // Audio de Drift
         if (driftSound != null)
         {
             bool isDrifting = currentSpeed > driftSpeedThreshold && Mathf.Abs(currentInput.x) > 0.1f;
@@ -210,9 +206,6 @@ public class BondiController : MonoBehaviour
 
     private void OnDisable()
     {
-        steerAction.Disable();
-        accelerateAction.Disable();
-        brakeAction.Disable();
-        hornAction.Disable();
+        steerAction.Disable(); accelerateAction.Disable(); brakeAction.Disable(); hornAction.Disable();
     }
 }

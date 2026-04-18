@@ -4,24 +4,19 @@ using System.Collections;
 public class ParadaController : MonoBehaviour
 {
     [Header("Configuracion de Parada")]
-    [Tooltip("Cantidad de personas esperando en esta parada")]
     public int pasajerosEnParada = 5;
-    [Tooltip("Segundos que tarda en subir/bajar cada pasajero")]
     public float tiempoPorPasajero = 1.0f;
 
     [Header("Configuracion de Destino")]
-    [Tooltip("Si esta activo, es una parada de destino donde bajan todos los pasajeros")]
     public bool esDestino = false;
 
     [Header("Configuracion de Materiales")]
     public Material materialCeleste;
     public Material materialVerde;
 
-    [Header("Referencia Spawner")]
     [HideInInspector] public ParadaSpawner spawner;
 
     private bool sonidoReproducido = false;
-
     private MeshRenderer meshRenderer;
     private PassengerController busActual;
     private Coroutine boardingCoroutine;
@@ -29,33 +24,31 @@ public class ParadaController : MonoBehaviour
     void Awake()
     {
         meshRenderer = GetComponent<MeshRenderer>();
-        spawner = GetComponentInParent<ParadaSpawner>();
+        // Intentamos buscarlo, pero el Spawner también lo asigna al inicio
+        if (spawner == null) spawner = GetComponentInParent<ParadaSpawner>();
         ResetParada();
     }
 
-    // --- ENTRADA ---
     private void OnCollisionEnter(Collision collision) => AlEntrar(collision.gameObject);
     private void OnTriggerEnter(Collider other) => AlEntrar(other.gameObject);
 
-    // --- SALIDA ---
     private void OnCollisionExit(Collision collision) => AlSalir(collision.gameObject);
     private void OnTriggerExit(Collider other) => AlSalir(other.gameObject);
 
     private void AlEntrar(GameObject obj)
     {
-        // 1. Buscamos el componente PassengerController primero
         PassengerController pc = obj.GetComponentInParent<PassengerController>() ?? obj.GetComponent<PassengerController>();
 
         if (pc != null)
         {
-            // 2. Filtramos por nombre del GameObject que tiene el script (el padre usualmente)
             string nombreBondi = pc.gameObject.name;
 
-            if (nombreBondi == "Bondi_J1" || nombreBondi == "Bondi_J2")
+            // --- CAMBIO CLAVE: AHORA DETECTA J1, J2, J3 Y J4 ---
+            if (nombreBondi.Contains("Bondi_J"))
             {
-                if (busActual != null) return;
+                if (busActual != null) return; // Si ya hay un bondi cargando, ignoramos el resto
 
-                Debug.Log($"Entró el bondi permitido: {nombreBondi}");
+                Debug.Log($"[Logística] Entró el bondi permitido: {nombreBondi}");
                 busActual = pc;
                 CambiarMaterial(materialVerde);
 
@@ -76,7 +69,8 @@ public class ParadaController : MonoBehaviour
             }
             else
             {
-                Debug.Log($"Objeto con PassengerController detectado ({nombreBondi}), pero NO es un bondi permitido.");
+                // Este es el mensaje que veías antes
+                Debug.LogWarning($"[Seguridad] {nombreBondi} intentó cargar pero no es un bondi permitido.");
             }
         }
     }
@@ -92,21 +86,16 @@ public class ParadaController : MonoBehaviour
                 {
                     StopCoroutine(boardingCoroutine);
                     boardingCoroutine = null;
-
-                    // CAMBIO CLAVE: En lugar de borrar (Clear), confirmamos (Commit) 
-                    // lo que haya llegado a subir hasta este frame.
-                    busActual.CommitPending();
+                    busActual.CommitPending(); // Confirmamos lo que subió hasta ahora
                 }
 
                 busActual.SetStatusText("");
                 CambiarMaterial(materialCeleste);
-
-                // Ya no llamamos al spawner acá para que la parada no desaparezca 
-                // si todavía quedan pasajeros esperando.
                 busActual = null;
             }
         }
     }
+
     private IEnumerator SubidaPasajerosProcedimiento()
     {
         int capacidadDisponible = busActual.GetRemainingCapacity();
@@ -118,15 +107,13 @@ public class ParadaController : MonoBehaviour
             if (busActual == null) break;
 
             busActual.SetStatusText($"Subiendo... {aSubir - subidosActualmente} restantes");
-
             yield return new WaitForSeconds(tiempoPorPasajero);
 
             if (busActual == null) break;
 
-            // --- PROCESAMIENTO ATÓMICO ---
             subidosActualmente++;
-            pasajerosEnParada--; // Restamos de la parada inmediatamente
-            busActual.AddPending(1); // Sumamos al bondi (como pendiente)
+            pasajerosEnParada--;
+            busActual.AddPending(1);
         }
 
         if (busActual != null)
@@ -134,14 +121,14 @@ public class ParadaController : MonoBehaviour
             busActual.SetStatusText("Listo");
             busActual.CommitPending();
 
-            // Si la parada se quedó sin gente (pasajerosEnParada == 0), 
-            // recién ahí le avisamos al spawner que cambie de parada.
+            // --- REVISIÓN DEL RESETEO ---
+            // Si la parada se vació, le avisamos al spawner.
             if (pasajerosEnParada <= 0 && spawner != null)
             {
+                Debug.Log($"[Spawner] Parada {gameObject.name} vacía. Solicitando nueva parada.");
                 spawner.OnParadaDesocupada(this, busActual.GetRemainingCapacity(), true);
             }
         }
-
         boardingCoroutine = null;
     }
 
@@ -152,9 +139,7 @@ public class ParadaController : MonoBehaviour
         while (pasajerosABajar > 0)
         {
             if (busActual == null) break;
-
             busActual.SetStatusText($"Bajando... {pasajerosABajar} restantes");
-
             yield return new WaitForSeconds(tiempoPorPasajero);
 
             if (busActual == null) break;
@@ -167,23 +152,26 @@ public class ParadaController : MonoBehaviour
         {
             busActual.SetStatusText("Listo");
             busActual.CommitPending();
-            Debug.Log($"Bajada completa. Pasajeros restantes en bus: {busActual.GetCurrentPassengers()}");
-        }
 
+            // Si es destino, se resetea apenas el primer bondi baja a todos
+            if (spawner != null)
+            {
+                spawner.OnParadaDesocupada(this, busActual.GetRemainingCapacity(), true);
+            }
+        }
         boardingCoroutine = null;
     }
 
     private void CambiarMaterial(Material nuevoMaterial)
     {
         if (meshRenderer != null && nuevoMaterial != null)
-        {
             meshRenderer.material = nuevoMaterial;
-        }
     }
 
     public void ResetParada()
     {
         pasajerosEnParada = UnityEngine.Random.Range(2, 9);
         sonidoReproducido = false;
+        CambiarMaterial(materialCeleste);
     }
 }

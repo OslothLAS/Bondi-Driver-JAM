@@ -6,11 +6,6 @@ public class ParadaFlecha : MonoBehaviour
     public GameObject prefabParada;
     public GameObject prefabDestino;
 
-    [Header("Referencias de Jugadores")]
-    public Transform bondi1;
-    public Transform bondi2;
-    public ParadaSpawner spawner;
-
     [Header("Configuracion de Orbita")]
     public float orbitRadius = 5f;
     public Vector3 ejeRotacion = Vector3.up;
@@ -20,33 +15,35 @@ public class ParadaFlecha : MonoBehaviour
     public Color colorParada = new Color(0f, 1f, 1f, 0.5f);
     public Color colorDestino = new Color(1f, 0.8f, 0f, 0.5f);
 
-    // Referencias a los scripts de pasajeros (NUEVO)
-    private PassengerController pc1, pc2;
+    [Header("Referencias (Opcional manual)")]
+    public ParadaSpawner spawner;
 
-    // Referencias internas de GameObjects
-    private GameObject fActual1, fActual2;
-    private GameObject fDestino1, fDestino2;
+    // --- ARRAYS PARA 4 JUGADORES ---
+    private Transform[] bondis = new Transform[4];
+    private PassengerController[] pcs = new PassengerController[4];
+    private GameObject[] fActuales = new GameObject[4];
+    private GameObject[] fDestinos = new GameObject[4];
 
     void Start()
     {
-        // 1. Buscamos bondis y sus PassengerControllers (NUEVO)
-        if (bondi1 == null) bondi1 = GameObject.Find("Bondi_J1")?.transform;
-        if (bondi2 == null) bondi2 = GameObject.Find("Bondi_J2")?.transform;
-
-        if (bondi1 != null) pc1 = bondi1.GetComponent<PassengerController>();
-        if (bondi2 != null) pc2 = bondi2.GetComponent<PassengerController>();
-
-        // 2. Instanciamos los prefabs
-        if (bondi1 != null)
+        for (int i = 0; i < 4; i++)
         {
-            if (prefabParada) fActual1 = CrearFlecha(bondi1, prefabParada, colorParada);
-            if (prefabDestino) fDestino1 = CrearFlecha(bondi1, prefabDestino, colorDestino);
-        }
+            // 1. Buscamos bondis por nombre (J1, J2, J3, J4)
+            string nombreBondi = "Bondi_J" + (i + 1);
+            GameObject objBondi = GameObject.Find(nombreBondi);
 
-        if (bondi2 != null)
-        {
-            if (prefabParada) fActual2 = CrearFlecha(bondi2, prefabParada, colorParada);
-            if (prefabDestino) fDestino2 = CrearFlecha(bondi2, prefabDestino, colorDestino);
+            if (objBondi != null)
+            {
+                bondis[i] = objBondi.transform;
+                pcs[i] = objBondi.GetComponent<PassengerController>();
+
+                // 2. Instanciamos las flechas para este jugador
+                if (prefabParada != null)
+                    fActuales[i] = CrearFlecha(bondis[i], prefabParada, colorParada);
+
+                if (prefabDestino != null)
+                    fDestinos[i] = CrearFlecha(bondis[i], prefabDestino, colorDestino);
+            }
         }
     }
 
@@ -67,34 +64,30 @@ public class ParadaFlecha : MonoBehaviour
     {
         if (spawner == null) return;
 
-        // Buscamos las paradas en el spawner
+        // Buscamos las paradas en el spawner una sola vez por frame
         ParadaController pActual = GetParadaPorTipo(false);
         ParadaController pDestino = GetParadaPorTipo(true);
 
-        // --- LÓGICA DE VISIBILIDAD BASADA EN PASAJEROS (NUEVO) ---
+        // Actualizamos cada jugador en un bucle
+        for (int i = 0; i < 4; i++)
+        {
+            if (bondis[i] == null) continue;
 
-        // Para el J1: La flecha de destino solo aparece si tiene pasajeros > 0
-        bool mostrarDestinoJ1 = (pc1 != null && pc1.GetCurrentPassengers() > 0);
+            // Lógica de visibilidad: Destino solo si tiene pasajeros
+            bool tienePasajeros = (pcs[i] != null && pcs[i].GetCurrentPassengers() > 0);
 
-        // Para el J2: Lo mismo
-        bool mostrarDestinoJ2 = (pc2 != null && pc2.GetCurrentPassengers() > 0);
+            // Flecha Parada Común
+            ActualizarPosicion(fActuales[i], bondis[i], pActual);
 
-        // --- ACTUALIZACIÓN DE FLECHAS ---
-
-        // Flechas de paradas comunes (Siempre aparecen si hay parada)
-        ActualizarPosicion(fActual1, bondi1, pActual);
-        ActualizarPosicion(fActual2, bondi2, pActual);
-
-        // Flechas de destino (Solo aparecen si tienen pasajeros)
-        ActualizarPosicion(fDestino1, bondi1, mostrarDestinoJ1 ? pDestino : null);
-        ActualizarPosicion(fDestino2, bondi2, mostrarDestinoJ2 ? pDestino : null);
+            // Flecha Destino
+            ActualizarPosicion(fDestinos[i], bondis[i], tienePasajeros ? pDestino : null);
+        }
     }
 
     void ActualizarPosicion(GameObject flecha, Transform bondi, ParadaController parada)
     {
         if (flecha == null || bondi == null) return;
 
-        // Si mandamos 'null' como parada, la flecha se oculta
         if (parada != null)
         {
             Vector3 dir = (parada.transform.position - bondi.position);
@@ -104,13 +97,14 @@ public class ParadaFlecha : MonoBehaviour
             finalPos += ejeRotacion.normalized * alturaExtra;
 
             flecha.transform.position = finalPos;
+            // Apuntar hacia el objetivo, rotando 90 en X si el modelo está acostado
             flecha.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(-90f, 0f, 0f);
 
-            flecha.SetActive(true);
+            if (!flecha.activeSelf) flecha.SetActive(true);
         }
         else
         {
-            flecha.SetActive(false);
+            if (flecha.activeSelf) flecha.SetActive(false);
         }
     }
 
@@ -125,9 +119,11 @@ public class ParadaFlecha : MonoBehaviour
 
     void OnDestroy()
     {
-        if (fActual1) Destroy(fActual1);
-        if (fActual2) Destroy(fActual2);
-        if (fDestino1) Destroy(fDestino1);
-        if (fDestino2) Destroy(fDestino2);
+        // Limpieza de todos los objetos instanciados
+        for (int i = 0; i < 4; i++)
+        {
+            if (fActuales[i]) Destroy(fActuales[i]);
+            if (fDestinos[i]) Destroy(fDestinos[i]);
+        }
     }
 }

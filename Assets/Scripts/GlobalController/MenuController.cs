@@ -4,6 +4,9 @@ using UnityEngine.EventSystems;
 
 public class MenuController : MonoBehaviour
 {
+
+    public static int modoJugadores = 2;
+
     public AudioSource popSound;
     public AudioSource backgroundSound;
     private GameObject lastButton;
@@ -30,6 +33,18 @@ public class MenuController : MonoBehaviour
         }
 
         lastButton = currentObject;
+    }
+
+    public void Seleccionar2Jugadores()
+    {
+        modoJugadores = 2;
+        Jugar();
+    }
+
+    public void Seleccionar4Jugadores()
+    {
+        modoJugadores = 4;
+        Jugar();
     }
 
     public void Jugar()
